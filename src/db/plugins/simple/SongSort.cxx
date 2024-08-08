@@ -66,6 +66,8 @@ song_cmp(const Song &a, const Song &b) noexcept
 {
 	int ret;
 
+	return IcuCollate(a.filename, b.filename) < 0; // only by filename
+
 	/* first sort by album */
 	ret = compare_string_tag_item(a.tag, b.tag, TAG_ALBUM);
 	if (ret != 0)
