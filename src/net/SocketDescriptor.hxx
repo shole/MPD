@@ -24,6 +24,8 @@ class SocketAddress;
 class StaticSocketAddress;
 class IPv4Address;
 class IPv6Address;
+class UniqueSocketDescriptor;
+class UniqueFileDescriptor;
 
 /**
  * An OO wrapper for a Berkeley or WinSock socket descriptor.
@@ -137,7 +139,10 @@ public:
 
 	using FileDescriptor::SetNonBlocking;
 	using FileDescriptor::SetBlocking;
-	using FileDescriptor::Duplicate;
+
+	[[nodiscard]]
+	UniqueSocketDescriptor Duplicate() const noexcept;
+
 	using FileDescriptor::CheckDuplicate;
 	using FileDescriptor::Close;
 #else
@@ -224,6 +229,16 @@ public:
 	[[gnu::pure]]
 	struct ucred GetPeerCredentials() const noexcept;
 #endif
+
+#ifdef __linux__
+	/**
+	 * Get a pidfd for the peer process.  Returns an undefined
+	 * instance on error (with errno set).
+	 *
+	 * Requires Linux 6.5.
+	 */
+	UniqueFileDescriptor GetPeerPidfd() const noexcept;
+#endif // __linux__
 
 	bool SetOption(int level, int name,
 		       const void *value, std::size_t size) const noexcept;

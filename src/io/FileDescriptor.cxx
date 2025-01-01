@@ -13,6 +13,7 @@
 
 #ifndef _WIN32
 #include <poll.h>
+#include <sys/uio.h> // for struct iovec
 #endif
 
 #ifndef O_NOCTTY
@@ -21,6 +22,13 @@
 
 #ifndef O_CLOEXEC
 #define O_CLOEXEC 0
+#endif
+
+/* this library implies the O_NONBLOCK in all open() calls to avoid
+   blocking the caller when a FIFO is opened; this may not only affect
+   the open() call but also other operations like mandatory locking */
+#ifndef O_NONBLOCK
+#define O_NONBLOCK 0
 #endif
 
 #ifndef _WIN32
@@ -60,7 +68,7 @@ bool
 FileDescriptor::Open(FileDescriptor dir, const char *pathname,
 		     int flags, mode_t mode) noexcept
 {
-	fd = ::openat(dir.Get(), pathname, flags | O_NOCTTY | O_CLOEXEC, mode);
+	fd = ::openat(dir.Get(), pathname, flags | O_NOCTTY | O_CLOEXEC | O_NONBLOCK, mode);
 	return IsDefined();
 }
 
@@ -69,7 +77,7 @@ FileDescriptor::Open(FileDescriptor dir, const char *pathname,
 bool
 FileDescriptor::Open(const char *pathname, int flags, mode_t mode) noexcept
 {
-	fd = ::open(pathname, flags | O_NOCTTY | O_CLOEXEC, mode);
+	fd = ::open(pathname, flags | O_NOCTTY | O_CLOEXEC | O_NONBLOCK, mode);
 	return IsDefined();
 }
 
@@ -78,7 +86,7 @@ FileDescriptor::Open(const char *pathname, int flags, mode_t mode) noexcept
 bool
 FileDescriptor::Open(const wchar_t *pathname, int flags, mode_t mode) noexcept
 {
-	fd = ::_wopen(pathname, flags | O_NOCTTY | O_CLOEXEC, mode);
+	fd = ::_wopen(pathname, flags | O_NOCTTY | O_CLOEXEC | O_NONBLOCK, mode);
 	return IsDefined();
 }
 
@@ -97,20 +105,6 @@ FileDescriptor::OpenReadOnly(FileDescriptor dir, const char *pathname) noexcept
 {
 	return Open(dir, pathname, O_RDONLY);
 }
-
-#endif // __linux__
-
-#ifndef _WIN32
-
-bool
-FileDescriptor::OpenNonBlocking(const char *pathname) noexcept
-{
-	return Open(pathname, O_RDWR | O_NONBLOCK);
-}
-
-#endif
-
-#ifdef __linux__
 
 bool
 FileDescriptor::CreatePipe(FileDescriptor &r, FileDescriptor &w,
@@ -213,6 +207,21 @@ FileDescriptor::DisableCloseOnExec() const noexcept
 	fcntl(fd, F_SETFD, old_flags & ~FD_CLOEXEC);
 }
 
+#ifdef __linux__
+
+void
+FileDescriptor::SetPipeCapacity(unsigned capacity) const noexcept
+{
+	/* the canonical type for buffer sizes is "size_t", but since
+           F_SETPIPE_SZ expects an "int" parameter, "size_t" would
+           have the wrong size; "unsigned" is always the same size as
+           "int", but using a signed integer would suggest that
+           negative values are okay when they're not */
+	fcntl(fd, F_SETPIPE_SZ, capacity);
+}
+
+#endif
+
 UniqueFileDescriptor
 FileDescriptor::Duplicate() const noexcept
 {
@@ -252,7 +261,7 @@ void
 FileDescriptor::FullRead(std::span<std::byte> dest) const
 {
 	while (!dest.empty()) {
-		ssize_t nbytes = Read(dest.data(), dest.size());
+		ssize_t nbytes = Read(dest);
 		if (nbytes <= 0) {
 			if (nbytes < 0)
 				throw MakeErrno("Failed to read");
@@ -267,7 +276,7 @@ void
 FileDescriptor::FullWrite(std::span<const std::byte> src) const
 {
 	while (!src.empty()) {
-		ssize_t nbytes = Write(src.data(), src.size());
+		ssize_t nbytes = Write(src);
 		if (nbytes <= 0) {
 			if (nbytes < 0)
 				throw MakeErrno("Failed to write");
@@ -279,6 +288,18 @@ FileDescriptor::FullWrite(std::span<const std::byte> src) const
 }
 
 #ifndef _WIN32
+
+ssize_t
+FileDescriptor::Read(std::span<const struct iovec> v) const noexcept
+{
+	return readv(fd, v.data(), v.size());
+}
+
+ssize_t
+FileDescriptor::Write(std::span<const struct iovec> v) const noexcept
+{
+	return writev(fd, v.data(), v.size());
+}
 
 int
 FileDescriptor::Poll(short events, int timeout) const noexcept

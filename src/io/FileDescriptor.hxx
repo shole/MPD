@@ -14,6 +14,7 @@
 #include <wchar.h>
 #endif
 
+struct iovec;
 class UniqueFileDescriptor;
 
 /**
@@ -114,14 +115,7 @@ public:
 	[[nodiscard]]
 	bool OpenReadOnly(FileDescriptor dir,
 			  const char *pathname) noexcept;
-#endif
 
-#ifndef _WIN32
-	[[nodiscard]]
-	bool OpenNonBlocking(const char *pathname) noexcept;
-#endif
-
-#ifdef __linux__
 	[[nodiscard]]
 	static bool CreatePipe(FileDescriptor &r, FileDescriptor &w,
 			       int flags) noexcept;
@@ -162,6 +156,15 @@ public:
 	 * is executed.
 	 */
 	void DisableCloseOnExec() const noexcept;
+
+#ifdef __linux__
+	/**
+	 * Set the capacity of the pipe.
+	 *
+	 * This method ignores errors.
+	 */
+	void SetPipeCapacity(unsigned capacity) const noexcept;
+#endif
 
 	/**
 	 * Duplicate this file descriptor.
@@ -227,9 +230,8 @@ public:
 
 #ifndef _WIN32
 	[[nodiscard]]
-	ssize_t ReadAt(off_t offset,
-		       void *buffer, std::size_t length) const noexcept {
-		return ::pread(fd, buffer, length, offset);
+	ssize_t ReadAt(off_t offset, std::span<std::byte> dest) const noexcept {
+		return ::pread(fd, dest.data(), dest.size(), offset);
 	}
 #endif
 
@@ -238,25 +240,22 @@ public:
 		return ::read(fd, dest.data(), dest.size());
 	}
 
-	[[nodiscard]]
-	ssize_t Read(void *buffer, std::size_t length) const noexcept {
-		return ::read(fd, buffer, length);
-	}
-
 	/**
 	 * Read until all of the given buffer has been filled.  Throws
 	 * on error.
 	 */
 	void FullRead(std::span<std::byte> dest) const;
 
+#ifndef _WIN32
+	[[nodiscard]]
+	ssize_t WriteAt(off_t offset, std::span<const std::byte> src) const noexcept {
+		return ::pwrite(fd, src.data(), src.size(), offset);
+	}
+#endif
+
 	[[nodiscard]]
 	ssize_t Write(std::span<const std::byte> src) const noexcept {
 		return ::write(fd, src.data(), src.size());
-	}
-
-	[[nodiscard]]
-	ssize_t Write(const void *buffer, std::size_t length) const noexcept {
-		return ::write(fd, buffer, length);
 	}
 
 	/**
@@ -266,6 +265,18 @@ public:
 	void FullWrite(std::span<const std::byte> src) const;
 
 #ifndef _WIN32
+	/**
+	 * Wrapper for readv().
+	 */
+	[[nodiscard]]
+	ssize_t Read(std::span<const struct iovec> v) const noexcept;
+
+	/**
+	 * Wrapper for writev().
+	 */
+	[[nodiscard]]
+	ssize_t Write(std::span<const struct iovec> v) const noexcept;
+
 	[[nodiscard]]
 	int Poll(short events, int timeout) const noexcept;
 

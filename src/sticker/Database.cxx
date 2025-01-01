@@ -46,6 +46,10 @@ enum sticker_sql {
 	STICKER_SQL_TRANSACTION_COMMIT,
 	STICKER_SQL_TRANSACTION_ROLLBACK,
 	STICKER_SQL_NAMES,
+	STICKER_SQL_NAMES_TYPES,
+	STICKER_SQL_NAMES_TYPES_BY_TYPE,
+	STICKER_SQL_INC,
+	STICKER_SQL_DEC,
 
 	STICKER_SQL_COUNT
 };
@@ -106,7 +110,23 @@ static constexpr auto sticker_sql = std::array {
 	"ROLLBACK",
 
 	//[STICKER_SQL_NAMES]
-	"SELECT DISTINCT name FROM sticker order by name",
+	"SELECT DISTINCT name FROM sticker ORDER BY name",
+
+	//[STICKER_SQL_NAMES_TYPES]
+	"SELECT name,type FROM sticker GROUP BY name,type ORDER BY name",
+
+	//[STICKER_SQL_NAMES_TYPES_BY_TYPE]
+	"SELECT name,type FROM sticker WHERE type = ? GROUP BY name,type ORDER BY name",
+
+	//[STICKER_SQL_INC] =
+	"INSERT INTO sticker (type, uri, name, value) VALUES (?, ?, ?, ?) "
+	"ON CONFLICT(type, uri, name) DO "
+	"UPDATE set value = value + ?",
+
+	//[STICKER_SQL_DEC] =
+	"INSERT INTO sticker (type, uri, name, value) VALUES (?, ?, ?, ?) "
+	"ON CONFLICT(type, uri, name) DO "
+	"UPDATE set value = value - ?",
 };
 
 static constexpr const char sticker_sql_create[] =
@@ -270,6 +290,52 @@ StickerDatabase::StoreValue(const char *type, const char *uri,
 
 	if (!UpdateValue(type, uri, name, value))
 		InsertValue(type, uri, name, value);
+}
+
+void
+StickerDatabase::IncValue(const char *type, const char *uri,
+			  const char *name, const char *value)
+{
+	sqlite3_stmt *const s = stmt[STICKER_SQL_INC];
+
+	assert(type != nullptr);
+	assert(uri != nullptr);
+	assert(name != nullptr);
+	assert(*name != 0);
+	assert(value != nullptr);
+
+	BindAll(s, type, uri, name, value, value);
+
+	AtScopeExit(s) {
+		sqlite3_reset(s);
+		sqlite3_clear_bindings(s);
+	};
+
+	ExecuteCommand(s);
+	idle_add(IDLE_STICKER);
+}
+
+void
+StickerDatabase::DecValue(const char *type, const char *uri,
+			  const char *name, const char *value)
+{
+	sqlite3_stmt *const s = stmt[STICKER_SQL_DEC];
+
+	assert(type != nullptr);
+	assert(uri != nullptr);
+	assert(name != nullptr);
+	assert(*name != 0);
+	assert(value != nullptr);
+
+	BindAll(s, type, uri, name, value, value);
+
+	AtScopeExit(s) {
+		sqlite3_reset(s);
+		sqlite3_clear_bindings(s);
+	};
+
+	ExecuteCommand(s);
+	idle_add(IDLE_STICKER);
 }
 
 bool
@@ -475,6 +541,29 @@ StickerDatabase::Names(void (*func)(const char *value, void *user_data), void *u
 
 	ExecuteForEach(s, [s, func, user_data](){
 			func((const char*)sqlite3_column_text(s, 0), user_data);
+		});
+}
+
+void
+StickerDatabase::NamesTypes(const char *type, void (*func)(const char *value, const char *type, void *user_data), void *user_data)
+{
+	assert(func != nullptr);
+
+	sqlite3_stmt *const s = type == nullptr
+		? stmt[STICKER_SQL_NAMES_TYPES]
+		: stmt[STICKER_SQL_NAMES_TYPES_BY_TYPE];
+	assert(s != nullptr);
+
+	if (type != nullptr)
+		BindAll(s, type);
+
+	AtScopeExit(s) {
+		sqlite3_reset(s);
+	};
+
+	ExecuteForEach(s, [s, func, user_data](){
+			func((const char*)sqlite3_column_text(s, 0),
+			     (const char*)sqlite3_column_text(s, 1), user_data);
 		});
 }
 

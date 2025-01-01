@@ -17,6 +17,7 @@
 #include "Instance.hxx"
 #include "util/StringAPI.hxx"
 #include "util/ScopeExit.hxx"
+#include "tag/Settings.hxx"
 #include "tag/ParseName.hxx"
 #include "tag/Names.hxx"
 #include "sticker/TagSticker.hxx"
@@ -25,6 +26,7 @@
 #include "db/PlaylistInfo.hxx"
 #include "db/PlaylistVector.hxx"
 #include "db/DatabaseLock.hxx"
+#include <fmt/format.h>
 #include "song/Filter.hxx"
 
 namespace {
@@ -52,6 +54,24 @@ public:
 					    ValidateUri(uri).c_str(),
 					    name,
 					    value);
+
+		return CommandResult::OK;
+	}
+
+	virtual CommandResult Inc(const char *uri, const char *name, const char *value) {
+		sticker_database.IncValue(sticker_type,
+					  ValidateUri(uri).c_str(),
+					  name,
+					  value);
+
+		return CommandResult::OK;
+	}
+
+	virtual CommandResult Dec(const char *uri, const char *name, const char *value) {
+		sticker_database.DecValue(sticker_type,
+					  ValidateUri(uri).c_str(),
+					  name,
+					  value);
 
 		return CommandResult::OK;
 	}
@@ -118,6 +138,25 @@ public:
 		};
 
 		sticker_database.Names(callback, &data);
+
+		return CommandResult::OK;
+	}
+
+	CommandResult NamesTypes(const char *type) {
+		auto data = CallbackContext{
+			.name = "",
+			.sticker_type = sticker_type,
+			.response = response,
+			.is_song = StringIsEqual("song", sticker_type)
+		};
+
+		auto callback = [](const char *found_value, const char *found_type, void *user_data) {
+			auto context = reinterpret_cast<CallbackContext *>(user_data);
+			context->response.Fmt("name: {}\n", found_value);
+			context->response.Fmt("type: {}\n", found_type);
+		};
+
+		sticker_database.NamesTypes(type, callback, &data);
 
 		return CommandResult::OK;
 	}
@@ -333,6 +372,41 @@ handle_sticker_names(Client &client, Request args, Response &r)
 }
 
 CommandResult
+handle_sticker_names_types(Client &client, Request args, Response &r)
+{
+	auto &instance = client.GetInstance();
+	if (!instance.HasStickerDatabase()) {
+		r.Error(ACK_ERROR_UNKNOWN, "sticker database is disabled");
+		return CommandResult::ERROR;
+	}
+
+	auto &db = client.GetPartition().GetDatabaseOrThrow();
+	auto &sticker_database = *instance.sticker_database;
+
+	auto type = args.GetOptional(0);
+	std::unique_ptr<DomainHandler> handler = std::make_unique<SongHandler>(r, db, sticker_database);
+
+	if (type == nullptr ||
+	    StringIsEqual(type, "song") ||
+	    StringIsEqual(type, "playlist") ||
+	    StringIsEqual(type, "filter")) {
+		return handler->NamesTypes(type);
+	}
+	auto tag_type = tag_name_parse(type);
+	if (tag_type == TAG_NUM_OF_ITEM_TYPES) {
+		r.FmtError(ACK_ERROR_ARG, "no such tag {:?}", type);
+		return CommandResult::ERROR;
+	}
+	else if (sticker_allowed_tags.Test(tag_type)) {
+		return handler->NamesTypes(type);
+	}
+	else {
+		r.FmtError(ACK_ERROR_ARG, "unsupported tag {:?}", type);
+		return CommandResult::ERROR;
+	}
+}
+
+CommandResult
 handle_sticker(Client &client, Request args, Response &r)
 {
 	// must be enforced by the caller
@@ -384,6 +458,14 @@ handle_sticker(Client &client, Request args, Response &r)
 	/* set */
 	if (args.size() == 5 && StringIsEqual(cmd, "set"))
 		return handler->Set(uri, sticker_name, args[4]);
+	
+	/* inc */
+	if (args.size() == 5 && StringIsEqual(cmd, "inc"))
+		return handler->Inc(uri, sticker_name, args[4]);
+
+	/* dec */
+	if (args.size() == 5 && StringIsEqual(cmd, "dec"))
+		return handler->Dec(uri, sticker_name, args[4]);
 
 	/* delete */
 	if ((args.size() == 3 || args.size() == 4) && StringIsEqual(cmd, "delete"))
@@ -453,4 +535,21 @@ handle_sticker(Client &client, Request args, Response &r)
 
 	r.Error(ACK_ERROR_ARG, "bad request");
 	return CommandResult::ERROR;
+}
+
+CommandResult
+handle_sticker_types(Client &client, Request args, Response &r)
+{
+	(void) client;
+	(void) args;
+	const auto tag_mask = global_tag_mask & r.GetTagMask();
+
+	r.Fmt("stickertype: filter\n");
+	r.Fmt("stickertype: playlist\n");
+	r.Fmt("stickertype: song\n");
+	for (unsigned i = 0; i < TAG_NUM_OF_ITEM_TYPES; i++)
+		if (sticker_allowed_tags.Test(TagType(i)) &&
+		    tag_mask.Test(TagType(i)))
+			r.Fmt(FMT_STRING("stickertype: {}\n"), tag_item_names[i]);
+	return CommandResult::OK;
 }

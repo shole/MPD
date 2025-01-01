@@ -52,6 +52,10 @@ class StickerDatabase {
 		  SQL_TRANSACTION_COMMIT,
 		  SQL_TRANSACTION_ROLLBACK,
 		  SQL_NAMES,
+		  SQL_NAMES_TYPES,
+		  SQL_NAMES_TYPES_BY_TYPE,
+		  STICKER_SQL_INC,
+		  STICKER_SQL_DEC,
 
 		  SQL_COUNT
 	};
@@ -116,6 +120,24 @@ public:
 	 */
 	void StoreValue(const char *type, const char *uri,
 			const char *name, const char *value);
+	
+	/**
+	 * Increments a sticker by value in the specified object.  Inserts
+	 * the value if object does not exist.
+	 *
+	 * Throws #SqliteError on error.
+	 */
+	void IncValue(const char *type, const char *uri,
+		      const char *name, const char *value);
+
+	/**
+	 * Decrements a sticker by value in the specified object.  Inserts
+	 * the value if object does not exist.
+	 *
+	 * Throws #SqliteError on error.
+	 */
+	void DecValue(const char *type, const char *uri,
+		      const char *name, const char *value);
 
 	/**
 	 * Deletes a sticker from the database.  All sticker values of the
@@ -165,6 +187,11 @@ public:
 	 * Uniq and sorted list of all sticker names
 	 */
 	void Names(void (*func)(const char *value, void *user_data), void *user_data);
+
+	/**
+	 * Uniq and sorted list of all sticker names by type
+	 */
+	void NamesTypes(const char *type, void (*func)(const char *value, const char *type, void *user_data), void *user_data);
 
 	using StickerTypeUriPair = std::pair<std::string, std::string>;
 

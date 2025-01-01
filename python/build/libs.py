@@ -76,8 +76,8 @@ gme = CmakeProject(
 )
 
 ffmpeg = FfmpegProject(
-    'http://ffmpeg.org/releases/ffmpeg-7.0.1.tar.xz',
-    'bce9eeb0f17ef8982390b1f37711a61b4290dc8c2a0c1a37b5857e85bfb0e4ff',
+    'http://ffmpeg.org/releases/ffmpeg-7.1.tar.xz',
+    '40973d44970dbc83ef302b0609f2e74982be2d85916dd2ee7472d30678a7abe6',
     'lib/libavcodec.a',
     [
         '--disable-shared', '--enable-static',
