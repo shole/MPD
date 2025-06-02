@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright The Music Player Daemon Project
 
-#include "config.h"
 #include "PlaylistSave.hxx"
 #include "PlaylistFile.hxx"
 #include "PlaylistError.hxx"
@@ -9,6 +8,7 @@
 #include "song/DetachedSong.hxx"
 #include "Mapper.hxx"
 #include "Idle.hxx"
+#include "db/Features.hxx" // for ENABLE_DATABASE
 #include "fs/AllocatedPath.hxx"
 #include "fs/Traits.hxx"
 #include "fs/FileSystem.hxx"
@@ -26,11 +26,11 @@ playlist_print_path(BufferedOutputStream &os, const Path path)
 	   "narrow" charset (i.e. CP_ACP) is incapable of storing all
 	   Unicode paths */
 	try {
-		os.Fmt(FMT_STRING("{}\n"), path.ToUTF8Throw());
+		os.Fmt("{}\n", path.ToUTF8Throw());
 	} catch (...) {
 	}
 #else
-	os.Fmt(FMT_STRING("{}\n"), path.c_str());
+	os.Fmt("{}\n", path.c_str());
 #endif
 }
 

@@ -27,6 +27,7 @@
 #include "io/uring/Features.h"
 #ifdef HAVE_URING
 #include <memory>
+struct io_uring_params;
 namespace Uring { class Queue; class Manager; }
 #endif
 
@@ -67,6 +68,12 @@ class EventLoop final
 	 */
 	DeferList idle;
 
+	/**
+	 * This is like #idle, but gets invoked after the next
+	 * epoll_wait() call.
+	 */
+	DeferList next;
+
 #ifdef HAVE_THREADED_EVENT_LOOP
 	Mutex mutex;
 
@@ -90,9 +97,21 @@ class EventLoop final
 
 #ifdef HAVE_URING
 	std::unique_ptr<Uring::Manager> uring;
-#endif
+
+	/**
+	 * This class handles IORING_POLL_ADD_MULTI on the epoll file
+	 * descriptor and sets #epoll_ready.
+	 */
+	class UringPoll;
+	std::unique_ptr<UringPoll> uring_poll;
+#endif // HAVE_URING
 
 #ifdef HAVE_THREADED_EVENT_LOOP
+#if defined(USE_EVENTFD) && defined(HAVE_URING)
+	class UringWake;
+	std::unique_ptr<UringWake> uring_wake;
+#endif
+
 	/**
 	 * A reference to the thread that is currently inside Run().
 	 */
@@ -115,6 +134,14 @@ class EventLoop final
 	 */
 	bool again;
 
+#ifdef HAVE_URING
+	/**
+	 * Set by #UringPoll to signal that we should invoke
+	 * epoll_wait().
+	 */
+	bool epoll_ready = false;
+#endif // HAVE_URING
+
 #ifdef HAVE_THREADED_EVENT_LOOP
 	bool quit_injected = false;
 
@@ -127,10 +154,6 @@ class EventLoop final
 	bool busy = true;
 #endif
 
-#ifdef HAVE_URING
-	bool uring_initialized = false;
-#endif
-
 	ClockCache<std::chrono::steady_clock> steady_clock_cache;
 
 public:
@@ -141,6 +164,12 @@ public:
 	explicit EventLoop(ThreadId _thread);
 
 	EventLoop():EventLoop(ThreadId::GetCurrent()) {}
+
+	void SetThread(ThreadId _thread) noexcept {
+		assert(thread.IsNull());
+
+		thread = _thread;
+	}
 #else
 	EventLoop();
 #endif
@@ -173,8 +202,27 @@ public:
 		steady_clock_cache.flush();
 	}
 
+	void SetVolatile() noexcept;
+
 #ifdef HAVE_URING
-	[[gnu::pure]]
+	/**
+	 * Try to enable io_uring support.  If this method succeeds,
+	 * GetUring() can be used to obtain a pointer to the queue
+	 * instance.
+	 *
+	 * Throws on error.
+	 */
+	void EnableUring(unsigned entries, unsigned flags);
+	void EnableUring(unsigned entries, struct io_uring_params &params);
+
+	void DisableUring() noexcept;
+
+	/**
+	 * Returns a pointer to the io_uring queue instance or nullptr
+	 * if io_uring support is not available (or was not enabled
+	 * using EnableUring()).
+	 */
+	[[nodiscard]] [[gnu::const]]
 	Uring::Queue *GetUring() noexcept;
 #endif
 
@@ -226,6 +274,7 @@ public:
 	 */
 	void AddDefer(DeferEvent &e) noexcept;
 	void AddIdle(DeferEvent &e) noexcept;
+	void AddNext(DeferEvent &e) noexcept;
 
 #ifdef HAVE_THREADED_EVENT_LOOP
 	/**
@@ -282,9 +331,20 @@ private:
 	 *
 	 * @return true if one or more sockets have become ready
 	 */
-	bool Wait(Event::Duration timeout) noexcept;
+	bool Poll(Event::Duration timeout) noexcept;
+
+#ifdef HAVE_URING
+	void UringWait(Event::Duration timeout) noexcept;
+#endif
+
+	/**
+	 * Wait for I/O (socket) events, either using Poll() or
+	 * UringWait().
+	 */
+	void Wait(Event::Duration timeout) noexcept;
 
 #ifdef HAVE_THREADED_EVENT_LOOP
+	void OnWake() noexcept;
 	void OnSocketReady(unsigned flags) noexcept;
 #endif
 

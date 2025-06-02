@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright The Music Player Daemon Project
 
-#include "config.h"
+#include "config.h" // for ENABLE_FFMPEG
 #include "DecoderList.hxx"
 #include "DecoderPlugin.hxx"
 #include "Domain.hxx"
 #include "decoder/Features.h"
+#include "pcm/Features.h" // for ENABLE_DSD
 #include "lib/fmt/ExceptionFormatter.hxx"
 #include "lib/fmt/RuntimeError.hxx"
 #include "config/Data.hxx"
@@ -21,6 +22,7 @@
 #include "plugins/WavpackDecoderPlugin.hxx"
 #include "plugins/FfmpegDecoderPlugin.hxx"
 #include "plugins/GmeDecoderPlugin.hxx"
+#include "plugins/VgmstreamDecoderPlugin.hxx"
 #include "plugins/FaadDecoderPlugin.hxx"
 #include "plugins/MadDecoderPlugin.hxx"
 #include "plugins/SndfileDecoderPlugin.hxx"
@@ -56,12 +58,6 @@ constinit const struct DecoderPlugin *const decoder_plugins[] = {
 #endif
 #ifdef ENABLE_OPUS
 	&opus_decoder_plugin,
-#endif
-#ifdef ENABLE_SNDFILE
-	&sndfile_decoder_plugin,
-#endif
-#ifdef ENABLE_AUDIOFILE
-	&audiofile_decoder_plugin,
 #endif
 #ifdef ENABLE_DSD
 	&dsdiff_decoder_plugin,
@@ -100,9 +96,25 @@ constinit const struct DecoderPlugin *const decoder_plugins[] = {
 #ifdef ENABLE_GME
 	&gme_decoder_plugin,
 #endif
+#ifdef ENABLE_VGMSTREAM
+	&vgmstream_decoder_plugin,
+#endif
 #ifdef ENABLE_FFMPEG
 	&ffmpeg_decoder_plugin,
 #endif
+
+	/* these WAV-decoding plugins are below ffmpeg_decoder_plugin
+	   to give FFmpeg a chance to decode DTS-WAV files which is
+	   technically DTS Coherent Acoustics (DCA) stream wrapped in
+	   fake 16-bit stereo samples; neither libsndfile nor
+	   libaudiofile detect this, but FFmpeg does */
+#ifdef ENABLE_SNDFILE
+	&sndfile_decoder_plugin,
+#endif
+#ifdef ENABLE_AUDIOFILE
+	&audiofile_decoder_plugin,
+#endif
+
 	&pcm_decoder_plugin,
 	nullptr
 };

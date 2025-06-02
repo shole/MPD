@@ -8,6 +8,8 @@ playlist_plugins_deps = [
   log_dep,
   expat_dep,
   flac_dep,
+  input_basic_dep,
+  config_dep,
 ]
 
 playlist_features.set('ENABLE_CUE', get_option('cue'))
@@ -29,21 +31,6 @@ endif
 
 if flac_dep.found()
   playlist_plugins_sources += 'FlacPlaylistPlugin.cxx'
-endif
-
-soundcloud_feature = get_option('soundcloud')
-if soundcloud_feature.disabled()
-  enable_soundcloud = false
-else
-  enable_soundcloud = curl_dep.found() and yajl_dep.found()
-  if not enable_soundcloud and soundcloud_feature.enabled()
-    error('SoundCloud requires CURL and libyajl')
-  endif
-endif
-playlist_features.set('ENABLE_SOUNDCLOUD', enable_soundcloud)
-if enable_soundcloud
-  playlist_plugins_sources += 'SoundCloudPlaylistPlugin.cxx'
-  playlist_plugins_deps += yajl_dep
 endif
 
 playlist_plugins = static_library(

@@ -22,8 +22,10 @@ curl = static_library(
   'Adapter.cxx',
   'Escape.cxx',
   'Form.cxx',
+  'StringHandler.cxx',
   include_directories: inc,
   dependencies: [
+    event_dep,
     log_dep,
     curl_dep,
   ],

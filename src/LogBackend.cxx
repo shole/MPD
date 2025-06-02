@@ -3,13 +3,16 @@
 
 #include "LogBackend.hxx"
 #include "Log.hxx"
-#include "util/Compiler.h"
+#include "lib/fmt/Unsafe.hxx"
 #include "util/Domain.hxx"
 #include "util/StringStrip.hxx"
 #include "Version.h"
 #include "config.h"
 
+#include <fmt/chrono.h>
+
 #include <cassert>
+#include <utility> // for std::unreachable()
 
 #include <stdio.h>
 #include <string.h>
@@ -18,6 +21,8 @@
 #ifdef HAVE_SYSLOG
 #include <syslog.h>
 #endif
+
+using std::string_view_literals::operator""sv;
 
 #ifdef ANDROID
 #include <android/log.h>
@@ -42,8 +47,7 @@ ToAndroidLogLevel(LogLevel log_level) noexcept
 		return ANDROID_LOG_ERROR;
 	}
 
-	assert(false);
-	gcc_unreachable();
+	std::unreachable();
 }
 
 #else
@@ -73,14 +77,17 @@ EnableLogTimestamp() noexcept
 	enable_timestamp = true;
 }
 
-static const char *
+static std::string_view
 log_date() noexcept
 {
-	static constexpr size_t LOG_DATE_BUF_SIZE = 16;
+	static constexpr size_t LOG_DATE_BUF_SIZE = std::char_traits<char>::length("2025-01-22T15:43:14 ") + 1;
 	static char buf[LOG_DATE_BUF_SIZE];
 	time_t t = time(nullptr);
-	strftime(buf, LOG_DATE_BUF_SIZE, "%b %d %H:%M : ", localtime(&t));
-	return buf;
+	const auto *tm = std::localtime(&t);
+	if (tm == nullptr)
+		return {};
+
+	return FmtUnsafeSV(buf, "{:%FT%T} "sv, *tm);
 }
 
 #ifdef HAVE_SYSLOG
@@ -116,8 +123,7 @@ ToSysLogLevel(LogLevel log_level) noexcept
 		return LOG_ERR;
 	}
 
-	assert(false);
-	gcc_unreachable();
+	std::unreachable();
 }
 
 static void
@@ -148,7 +154,7 @@ static void
 FileLog(const Domain &domain, std::string_view message) noexcept
 {
 	fmt::print(stderr, "{}{}: {}\n",
-		   enable_timestamp ? log_date() : "",
+		   enable_timestamp ? log_date() : ""sv,
 		   domain.GetName(),
 		   StripRight(message));
 

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright The Music Player Daemon Project
 
-#include "config.h"
 #include "PlaylistCommands.hxx"
 #include "PositionArg.hxx"
 #include "Request.hxx"
 #include "Instance.hxx"
+#include "db/Features.hxx" // for ENABLE_DATABASE
 #include "db/Interface.hxx"
 #include "db/Selection.hxx"
 #include "db/DatabasePlaylist.hxx"
@@ -43,7 +43,7 @@ static void
 print_spl_list(Response &r, const PlaylistVector &list)
 {
 	for (const auto &i : list) {
-		r.Fmt(FMT_STRING("playlist: {}\n"), i.name);
+		r.Fmt("playlist: {}\n", i.name);
 
 		if (!IsNegative(i.mtime))
 			time_print(r, "Last-Modified", i.mtime);

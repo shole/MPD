@@ -30,7 +30,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Music Player Daemon'
-copyright = '2003-2021 The Music Player Daemon Project'
+copyright = '2003-2025 The Music Player Daemon Project'
 author = 'Max Kellermann'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -104,6 +104,13 @@ todo_include_todos = False
 # a list of builtin themes.
 #
 html_theme = 'sphinx_rtd_theme'
+
+try:
+    __import__(html_theme)
+except ModuleNotFoundError:
+    import sys
+    print(f"Warning: Sphinx theme {html_theme!r} not available, falling back to the default theme", file=sys.stderr)
+    del html_theme
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the

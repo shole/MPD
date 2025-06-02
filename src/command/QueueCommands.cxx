@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright The Music Player Daemon Project
 
-#include "config.h"
 #include "QueueCommands.hxx"
 #include "PositionArg.hxx"
 #include "Request.hxx"
 #include "protocol/RangeArg.hxx"
+#include "db/Features.hxx" // for ENABLE_DATABASE
 #include "db/DatabaseQueue.hxx"
 #include "db/Selection.hxx"
 #include "tag/ParseName.hxx"
@@ -140,7 +140,7 @@ handle_addid(Client &client, Request args, Response &r)
 
 	partition.instance.LookupRemoteTag(uri);
 
-	r.Fmt(FMT_STRING("Id: {}\n"), added_id);
+	r.Fmt("Id: {}\n", added_id);
 	return CommandResult::OK;
 }
 

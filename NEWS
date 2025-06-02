@@ -1,4 +1,74 @@
-ver 0.24 (not yet released)
+ver 0.25 (not yet released)
+* protocol
+  - implement "window" parameter for command "list"
+* decoder
+  - vgmstream: new plugin
+* output
+  - pipewire: add option "reconnect_stream"
+* switch to C++23
+* require Meson 1.2
+
+ver 0.24.5 (not yet released)
+
+ver 0.24.4 (2025/05/20)
+* protocol
+  - fix stuck "getfingerprint" with io_uring
+* decoder
+  - mpg123: support Icy stream tags
+  - mpg123: use libid3tag to parse stream tags
+* tags
+  - id3: fix assertion failure with broken AIFF/RIFF ID3 chunks
+* output
+  - fix resuming playback after it was paused by "single" mode
+  - alsa: fix compiler warning with alsa-lib 1.2.14
+
+ver 0.24.3 (2025/04/09)
+* input
+  - qobuz: use nlohmann_json instead of yajl
+* playlist
+  - soundcloud: remove defunct plugin
+* decoder
+  - ffmpeg: support WMA
+  - mpg123: fix trailing space in tag values
+* tags
+  - libid3tag: fix Meson subproject configure error
+  - libid3tag: add missing zlib dependency to Meson subproject
+* output
+  - oss: fix error "Resource temporarily unavailable"
+  - shout: fix hang on activating shout output
+  - snapcast: use nlohmann_json instead of yajl to generate JSON tags
+* Linux
+  - allow using io_uring on Linux kernels older than 6.0
+* Windows
+  - fix cross build on Linux when WINE is not installed
+* DSD: support channel conversion
+
+ver 0.24.2 (2025/03/26)
+* input
+  - io_uring: fix stuck seek after I/O error
+* decoder
+  - flac: enable chained Ogg decoding
+* player
+  - fix stalled playback after queue modification
+  - fix deadlock with "single" mode
+* Linux: fix build failure with ancient kernel headers
+
+ver 0.24.1 (2025/03/21)
+* input
+  - curl: fix malformed "Range" header
+* output
+  - sndio: fix rounding error in volume calculation
+* log: include year in time stamp
+* Linux
+  - add configure-time check for openat2()
+  - fix use-after-free bug on io_uring shutdown
+* macOS
+  - implement standard directories
+  - fix command-line parser errors
+* fix build failure in the "id3tag" Meson subproject
+* doc: use "sphinx_rtd_theme" only if it is installed
+
+ver 0.24 (2025/03/11)
 * protocol
   - new command "searchcount" (case-insensitive "count")
   - "playlistfind"/"playlistsearch" have "sort" and "window" parameters
@@ -58,17 +128,28 @@ ver 0.24 (not yet released)
   - alsa: require alsa-lib 1.1 or later
   - pipewire: map tags "Date" and "Comment"
 * switch to C++20
-  - GCC 10 or clang 11 (or newer) recommended
+  - GCC 12 or clang 14 (or newer) recommended
 * static partition configuration
 * Windows
   - build with libsamplerate
   - remove JACK DLL support
 * remove Haiku support
-* remove macOS support
 * remove Boost dependency
 * require libfmt 9 or later
 * documentation: switch to sphinx-rtd-theme
 * require Meson 1.0
+
+ver 0.23.17 (2025/01/29)
+* protocol
+  - "albumart" tries to send larger chunks if available
+  - explicitly disallow "idle" and "noidle" in command lists
+* storage
+  - nfs: require libnfs 4.0 or later
+* database
+  - inotify: trigger update after symlink was created
+* decoder
+  - ffmpeg: prefer over sndfile and audiofile for its DTS-WAV support
+* support libfmt 11.1
 
 ver 0.23.16 (2024/12/03)
 * database

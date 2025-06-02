@@ -7,9 +7,15 @@
 #include "IPv4Address.hxx"
 #include "IPv6Address.hxx"
 #include "UniqueSocketDescriptor.hxx"
+#include "PeerCredentials.hxx"
+#include "net/Features.hxx" // for HAVE_TCP, HAVE_IPV6, HAVE_UN, ...
 
 #ifdef __linux__
 #include "io/UniqueFileDescriptor.hxx"
+#endif
+
+#ifdef HAVE_GETPEEREID
+#include <unistd.h> // for getpeereid()
 #endif
 
 #ifdef _WIN32
@@ -225,19 +231,24 @@ SocketDescriptor::GetIntOption(int level, int name, int fallback) const noexcept
 	return value;
 }
 
-#ifdef HAVE_STRUCT_UCRED
-
-struct ucred
+SocketPeerCredentials
 SocketDescriptor::GetPeerCredentials() const noexcept
 {
-	struct ucred cred;
+#ifdef HAVE_STRUCT_UCRED
+	SocketPeerCredentials cred;
 	if (GetOption(SOL_SOCKET, SO_PEERCRED,
-		      &cred, sizeof(cred)) < sizeof(cred))
-		cred.pid = -1;
+		      &cred.cred, sizeof(cred.cred)) < sizeof(cred.cred))
+		return SocketPeerCredentials::Undefined();
 	return cred;
-}
-
+#elif defined(HAVE_GETPEEREID)
+	SocketPeerCredentials cred;
+	return getpeereid(Get(), &cred.uid, &cred.gid) == 0
+		? cred
+		: SocketPeerCredentials::Undefined();
+#else
+	return SocketPeerCredentials::Undefined();
 #endif
+}
 
 #ifdef __linux__
 
@@ -252,7 +263,7 @@ SocketDescriptor::GetPeerPidfd() const noexcept
 	if (GetOption(SOL_SOCKET, SO_PEERPIDFD, &pidfd, sizeof(pidfd)) < sizeof(pidfd))
 		return {};
 
-	return UniqueFileDescriptor{pidfd};
+	return UniqueFileDescriptor{AdoptTag{}, pidfd};
 }
 
 #endif // __linux__
@@ -359,6 +370,8 @@ SocketDescriptor::SetTcpFastOpen(int qlen) const noexcept
 
 #endif
 
+#ifdef HAVE_TCP
+
 bool
 SocketDescriptor::AddMembership(const IPv4Address &address) const noexcept
 {
@@ -366,6 +379,8 @@ SocketDescriptor::AddMembership(const IPv4Address &address) const noexcept
 	return setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP,
 			  &r, sizeof(r)) == 0;
 }
+
+#ifdef HAVE_IPV6
 
 bool
 SocketDescriptor::AddMembership(const IPv6Address &address) const noexcept
@@ -376,6 +391,8 @@ SocketDescriptor::AddMembership(const IPv6Address &address) const noexcept
 			  &r, sizeof(r)) == 0;
 }
 
+#endif // HAVE_IPV6
+
 bool
 SocketDescriptor::AddMembership(SocketAddress address) const noexcept
 {
@@ -383,8 +400,10 @@ SocketDescriptor::AddMembership(SocketAddress address) const noexcept
 	case AF_INET:
 		return AddMembership(IPv4Address(address));
 
+#ifdef HAVE_IPV6
 	case AF_INET6:
 		return AddMembership(IPv6Address(address));
+#endif
 
 	default:
 		errno = EINVAL;
@@ -392,7 +411,9 @@ SocketDescriptor::AddMembership(SocketAddress address) const noexcept
 	}
 }
 
-#endif
+#endif // HAVE_TCP
+
+#endif // __linux__
 
 bool
 SocketDescriptor::Bind(SocketAddress address) const noexcept

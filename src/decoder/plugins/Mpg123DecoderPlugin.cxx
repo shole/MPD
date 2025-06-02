@@ -16,6 +16,17 @@
 #include "util/Domain.hxx"
 #include "util/ScopeExit.hxx"
 #include "Log.hxx"
+#include "config.h" // for ENABLE_ID3TAG
+
+#ifdef ENABLE_ID3TAG
+#include "tag/Id3MixRamp.hxx"
+#include "tag/Id3Parse.hxx"
+#include "tag/Id3ReplayGain.hxx"
+#include "tag/Id3Scan.hxx"
+#include "tag/Id3Unique.hxx"
+#else
+#include "util/IterableSplitString.hxx"
+#endif
 
 #include <mpg123.h>
 
@@ -159,25 +170,51 @@ GetAudioFormat(mpg123_handle &handle, AudioFormat &audio_format)
 	return true;
 }
 
+#ifdef ENABLE_ID3TAG
+
+static UniqueId3Tag
+ParseId3(mpg123_handle &handle) noexcept
+{
+	unsigned char *data;
+	size_t size;
+
+	return mpg123_id3_raw(&handle, nullptr, nullptr, &data, &size) == MPG123_OK &&
+		data != nullptr && size > 0
+		? id3_tag_parse(std::span{reinterpret_cast<const std::byte *>(data), size})
+		: UniqueId3Tag{};
+}
+
+#else // ENABLE_ID3TAG
+
 static void
-AddTagItem(TagBuilder &tag, TagType type, const mpg123_string &s)
+AddTagItem(TagBuilder &tag, TagType type, const mpg123_string &s) noexcept
 {
 	assert(s.p != nullptr);
 	assert(s.size >= s.fill);
 	assert(s.fill > 0);
 
-	tag.AddItem(type, {s.p, s.fill - 1});
+	/* "fill" includes the closing null byte; strip it here */
+	const std::string_view all_values{s.p, s.fill - 1};
+
+	/* a mpg123_string can contain multiple values, each separated
+	   by a null byte */
+	for (const std::string_view value : IterableSplitString(all_values, '\0'))
+		/* we need this "empty" check because there is no
+		   value after the last null terminator */
+		if (!value.empty())
+			tag.AddItem(type, value);
 }
 
 static void
-AddTagItem(TagBuilder &tag, TagType type, const mpg123_string *s)
+AddTagItem(TagBuilder &tag, TagType type, const mpg123_string *s) noexcept
 {
 	if (s != nullptr)
 		AddTagItem(tag, type, *s);
 }
 
 static void
-mpd_mpg123_id3v2_tag(DecoderClient &client, const mpg123_id3v2 &id3v2)
+mpd_mpg123_id3v2_tag(DecoderClient &client, InputStream *is,
+		     const mpg123_id3v2 &id3v2) noexcept
 {
 	TagBuilder tag;
 
@@ -190,11 +227,11 @@ mpd_mpg123_id3v2_tag(DecoderClient &client, const mpg123_id3v2 &id3v2)
 	for (size_t i = 0, n = id3v2.comments; i < n; ++i)
 		AddTagItem(tag, TAG_COMMENT, id3v2.comment_list[i].text);
 
-	client.SubmitTag(nullptr, tag.Commit());
+	client.SubmitTag(is, tag.Commit());
 }
 
 static void
-mpd_mpg123_id3v2_extras(DecoderClient &client, const mpg123_id3v2 &id3v2)
+mpd_mpg123_id3v2_extras(DecoderClient &client, const mpg123_id3v2 &id3v2) noexcept
 {
 	ReplayGainInfo replay_gain;
 	replay_gain.Clear();
@@ -222,25 +259,51 @@ mpd_mpg123_id3v2_extras(DecoderClient &client, const mpg123_id3v2 &id3v2)
 }
 
 static void
-mpd_mpg123_id3v2(DecoderClient &client, const mpg123_id3v2 &id3v2)
+mpd_mpg123_id3v2(DecoderClient &client, InputStream *is,
+		 const mpg123_id3v2 &id3v2) noexcept
 {
-	mpd_mpg123_id3v2_tag(client, id3v2);
+	mpd_mpg123_id3v2_tag(client, is, id3v2);
 	mpd_mpg123_id3v2_extras(client, id3v2);
 }
 
+#endif // !ENABLE_ID3TAG
+
 static void
-mpd_mpg123_meta(DecoderClient &client, mpg123_handle *const handle)
+mpd_mpg123_meta(DecoderClient &client, InputStream *is,
+		mpg123_handle *const handle) noexcept
 {
 	if ((mpg123_meta_check(handle) & MPG123_NEW_ID3) == 0)
 		return;
 
-	mpg123_id3v1 *v1;
+#ifdef ENABLE_ID3TAG
+	/* get the raw ID3v2 tag from libmpg123 and parse it using
+	   libid3tag (for full ID3v2 support) */
+
+	if (const auto tag = ParseId3(*handle)) {
+		client.SubmitTag(is, tag_id3_import(tag.get()));
+
+		if (ReplayGainInfo rgi;
+		    Id3ToReplayGainInfo(rgi, tag.get()))
+			client.SubmitReplayGain(&rgi);
+
+		if (auto mix_ramp = Id3ToMixRampInfo(tag.get());
+		    mix_ramp.IsDefined())
+			client.SubmitMixRamp(std::move(mix_ramp));
+	}
+
+	/* this call clears the MPG123_NEW_ID3 flag */
+	mpg123_id3(handle, nullptr, nullptr);
+#else // ENABLE_ID3TAG
+	/* we don't have libid3tag: use libmpg123's built-in ID3v2
+	   parser (which doesn't support all tag types) */
+
 	mpg123_id3v2 *v2;
-	if (mpg123_id3(handle, &v1, &v2) != MPG123_OK)
+	if (mpg123_id3(handle, nullptr, &v2) != MPG123_OK)
 		return;
 
 	if (v2 != nullptr)
-		mpd_mpg123_id3v2(client, *v2);
+		mpd_mpg123_id3v2(client, is, *v2);
+#endif // !ENABLE_ID3TAG
 }
 
 [[gnu::pure]]
@@ -256,8 +319,14 @@ GetDuration(mpg123_handle &handle, const AudioFormat &audio_format) noexcept
 }
 
 static void
-Decode(DecoderClient &client, mpg123_handle &handle, const bool seekable)
+Decode(DecoderClient &client, InputStream *is,
+       mpg123_handle &handle, const bool seekable)
 {
+#ifdef ENABLE_ID3TAG
+	/* prepare for using mpg123_id3_raw() later */
+	mpg123_param(&handle, MPG123_ADD_FLAGS, MPG123_STORE_RAW_ID3, 0);
+#endif
+
 	AudioFormat audio_format;
 	if (!GetAudioFormat(handle, audio_format))
 		return;
@@ -288,7 +357,7 @@ Decode(DecoderClient &client, mpg123_handle &handle, const bool seekable)
 	DecoderCommand cmd;
 	do {
 		/* read metadata */
-		mpd_mpg123_meta(client, &handle);
+		mpd_mpg123_meta(client, is, &handle);
 
 		/* decode */
 
@@ -313,7 +382,7 @@ Decode(DecoderClient &client, mpg123_handle &handle, const bool seekable)
 
 		/* send to MPD */
 
-		cmd = client.SubmitAudio(nullptr, std::span{buffer, nbytes},
+		cmd = client.SubmitAudio(is, std::span{buffer, nbytes},
 					 info.bitrate);
 
 		if (cmd == DecoderCommand::SEEK) {
@@ -355,9 +424,9 @@ mpd_mpg123_stream_decode(DecoderClient &client, InputStream &is)
 	mpd_mpg123_open_stream(*handle, iohandle);
 
 	if (is.KnownSize())
-	    mpg123_set_filesize(handle, is.GetSize());
+		mpg123_set_filesize(handle, is.GetSize());
 
-	Decode(client, *handle, is.IsSeekable());
+	Decode(client, &is, *handle, is.IsSeekable());
 }
 
 static void
@@ -379,12 +448,17 @@ mpd_mpg123_file_decode(DecoderClient &client, Path path_fs)
 	if (!mpd_mpg123_open(handle, path_fs))
 		return;
 
-	Decode(client, *handle, true);
+	Decode(client, nullptr, *handle, true);
 }
 
 static bool
 Scan(mpg123_handle &handle, TagHandler &handler) noexcept
 {
+#ifdef ENABLE_ID3TAG
+	/* prepare for using mpg123_id3_raw() later */
+	mpg123_param(&handle, MPG123_ADD_FLAGS, MPG123_STORE_RAW_ID3, 0);
+#endif
+
 	AudioFormat audio_format;
 
 	try {
@@ -396,7 +470,10 @@ Scan(mpg123_handle &handle, TagHandler &handler) noexcept
 
 	handler.OnAudioFormat(audio_format);
 
-	/* ID3 tag support not yet implemented */
+#ifdef ENABLE_ID3TAG
+	if (const auto tag = ParseId3(handle))
+		scan_id3_tag(tag.get(), handler);
+#endif // ENABLE_ID3TAG
 
 	if (const off_t num_samples = mpg123_length(&handle); num_samples >= 0) {
 		const auto duration =

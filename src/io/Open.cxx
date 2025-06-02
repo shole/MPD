@@ -5,6 +5,14 @@
 #include "UniqueFileDescriptor.hxx"
 #include "lib/fmt/SystemError.hxx"
 
+#ifdef __linux__
+#include "system/linux/Features.h"
+#ifdef HAVE_OPENAT2
+#include "FileAt.hxx"
+#include "system/linux/openat2.h"
+#endif // HAVE_OPENAT2
+#endif // __linux__
+
 #include <fcntl.h>
 
 UniqueFileDescriptor
@@ -93,4 +101,25 @@ OpenDirectory(FileDescriptor directory, const char *name, int flags)
 	return fd;
 }
 
-#endif
+#ifdef HAVE_OPENAT2
+
+UniqueFileDescriptor
+TryOpen(FileAt file, const struct open_how &how) noexcept
+{
+	int fd = openat2(file.directory.Get(), file.name, &how, sizeof(how));
+	return UniqueFileDescriptor{AdoptTag{}, fd};
+}
+
+UniqueFileDescriptor
+Open(FileAt file, const struct open_how &how)
+{
+	auto fd = TryOpen(file, how);
+	if (!fd.IsDefined())
+		throw FmtErrno("Failed to open {:?}", file.name);
+
+	return fd;
+}
+
+#endif // HAVE_OPENAT2
+
+#endif // __linux__

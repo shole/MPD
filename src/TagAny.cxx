@@ -6,17 +6,19 @@
 #include "TagFile.hxx"
 #include "tag/Generic.hxx"
 #include "song/LightSong.hxx"
+#include "db/Features.hxx" // for ENABLE_DATABASE
 #include "db/Interface.hxx"
 #include "storage/StorageInterface.hxx"
 #include "client/Client.hxx"
 #include "protocol/Ack.hxx"
 #include "fs/AllocatedPath.hxx"
 #include "input/InputStream.hxx"
-#include "util/Compiler.h"
 #include "util/ScopeExit.hxx"
 #include "util/StringCompare.hxx"
 #include "util/UriExtract.hxx"
 #include "LocateUri.hxx"
+
+#include <utility> // for std::unreachable()
 
 static void
 TagScanStream(const char *uri, TagHandler &handler)
@@ -142,5 +144,5 @@ TagScanAny(Client &client, const char *uri, TagHandler &handler)
 		return TagScanFile(located_uri.path, handler);
 	}
 
-	gcc_unreachable();
+	std::unreachable();
 }

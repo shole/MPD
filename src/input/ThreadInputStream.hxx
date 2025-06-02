@@ -62,7 +62,7 @@ class ThreadInputStream : public InputStream {
 
 public:
 	ThreadInputStream(const char *_plugin,
-			  const char *_uri, Mutex &_mutex,
+			  std::string_view _uri, Mutex &_mutex,
 			  size_t _buffer_size) noexcept;
 
 #ifndef NDEBUG
@@ -151,6 +151,8 @@ protected:
 	virtual void Cancel() noexcept {}
 
 private:
+	std::size_t ReadFromBuffer(std::span<std::byte> dest) noexcept;
+
 	bool IsSeeking() const noexcept {
 		return seek_offset != UNKNOWN_SIZE;
 	}

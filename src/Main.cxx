@@ -49,6 +49,7 @@
 #include "unix/Daemon.hxx"
 #endif
 
+#include "db/Features.hxx" // for ENABLE_DATABASE
 #ifdef ENABLE_DATABASE
 #include "db/update/Service.hxx"
 #include "db/Configured.hxx"
@@ -69,6 +70,7 @@
 #include "sticker/Database.hxx"
 #endif
 
+#include "archive/Features.h" // for ENABLE_ARCHIVE
 #ifdef ENABLE_ARCHIVE
 #include "archive/ArchiveList.hxx"
 #endif
@@ -86,6 +88,10 @@
 
 #ifdef ENABLE_DBUS
 #include "lib/dbus/Init.hxx"
+#endif
+
+#if defined(ENABLE_DAEMON) && defined(__APPLE__)
+#include "system/Error.hxx"
 #endif
 
 #ifdef ENABLE_SYSTEMD_DAEMON
@@ -659,6 +665,20 @@ MainOrThrow(int argc, char *argv[])
 	ConfigData raw_config;
 
 	ParseCommandLine(argc, argv, options, raw_config);
+
+#if defined(ENABLE_DAEMON) && defined(__APPLE__)
+	if (options.daemon) {
+		// Fork before any Objective-C runtime initializations
+		pid_t pid = fork();
+		if (pid < 0)
+			throw MakeErrno("fork() failed");
+
+		if (pid > 0) {
+			// Parent process: exit immediately
+			_exit(0);
+		}
+	}
+#endif
 
 	MainConfigured(options, raw_config);
 }

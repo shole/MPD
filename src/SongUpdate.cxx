@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright The Music Player Daemon Project
 
-#include "config.h" /* must be first for large file support */
 #include "song/DetachedSong.hxx"
+#include "db/Features.hxx" // for ENABLE_DATABASE
 #include "db/plugins/simple/Song.hxx"
 #include "db/plugins/simple/Directory.hxx"
 #include "storage/StorageInterface.hxx"
@@ -18,6 +18,7 @@
 #include "TagStream.hxx"
 #include "util/UriExtract.hxx"
 
+#include "archive/Features.h" // for ENABLE_ARCHIVE
 #ifdef ENABLE_ARCHIVE
 #include "TagArchive.hxx"
 #endif

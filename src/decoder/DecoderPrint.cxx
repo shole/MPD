@@ -19,19 +19,19 @@ decoder_plugin_print(Response &r,
 
 	assert(plugin.name != nullptr);
 
-	r.Fmt(FMT_STRING("plugin: {}\n"), plugin.name);
+	r.Fmt("plugin: {}\n", plugin.name);
 
 	if (plugin.suffixes != nullptr)
 		for (p = plugin.suffixes; *p != nullptr; ++p)
-			r.Fmt(FMT_STRING("suffix: {}\n"), *p);
+			r.Fmt("suffix: {}\n", *p);
 
 	if (plugin.suffixes_function != nullptr)
 		for (const auto &i : plugin.suffixes_function())
-			r.Fmt(FMT_STRING("suffix: {}\n"), i);
+			r.Fmt("suffix: {}\n", i);
 
 	if (plugin.mime_types != nullptr)
 		for (p = plugin.mime_types; *p != nullptr; ++p)
-			r.Fmt(FMT_STRING("mime_type: {}\n"), *p);
+			r.Fmt("mime_type: {}\n", *p);
 }
 
 void

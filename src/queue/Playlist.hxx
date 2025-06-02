@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright The Music Player Daemon Project
 
-#ifndef MPD_PLAYLIST_HXX
-#define MPD_PLAYLIST_HXX
+#pragma once
 
 #include "SingleMode.hxx"
 #include "ConsumeMode.hxx"
+#include "db/Features.hxx" // for ENABLE_DATABASE
 #include "queue/Queue.hxx"
-#include "config.h"
 
 enum TagType : uint8_t;
 struct Tag;
@@ -287,9 +286,17 @@ public:
 	void Stop(PlayerControl &pc) noexcept;
 
 	/**
+	 * Play any song ("current" song, or the first song.  Resumes
+	 * playback if paused.
+	 *
 	 * Throws on error.
 	 */
-	void PlayPosition(PlayerControl &pc, int position);
+	void PlayAny(PlayerControl &pc);
+
+	/**
+	 * Throws on error.
+	 */
+	void PlayPosition(PlayerControl &pc, unsigned position);
 
 	/**
 	 * Throws on error.
@@ -299,7 +306,7 @@ public:
 	/**
 	 * Throws on error.
 	 */
-	void PlayId(PlayerControl &pc, int id);
+	void PlayId(PlayerControl &pc, unsigned id);
 
 	/**
 	 * Throws on error.
@@ -380,5 +387,3 @@ private:
 	 */
 	unsigned MoveOrderToCurrent(unsigned old_order) noexcept;
 };
-
-#endif

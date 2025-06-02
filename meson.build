@@ -1,19 +1,20 @@
 project(
   'mpd',
   ['c', 'cpp'],
-  version: '0.24',
-  meson_version: '>= 1.0',
+  version: '0.25',
+  meson_version: '>= 1.2',
   default_options: [
     'c_std=c11',
     'build.c_std=c11',
-    'cpp_std=c++20',
-    'build.cpp_std=c++20',
+    'cpp_std=c++23',
+    'build.cpp_std=c++23',
     'warning_level=3',
 
-    'fmt:cpp_std=c++20',
+    'fmt:cpp_std=c++23',
 
     # If we build those libraries as Meson subproject, they shall be
     # linked statically into the MPD executable.
+    'default_library=static',
     'curl:default_library=static',
     'expat:default_library=static',
     'flac:default_library=static',
@@ -21,7 +22,10 @@ project(
     'gtest:default_library=static',
     'id3tag:default_library=static',
     'lame:default_library=static',
+    'libmicrohttpd:default_library=static',
     'libmpdclient:default_library=static',
+    'libnpupnp:default_library=static',
+    'libsndfile:default_library=static',
     'liburing:default_library=static',
     'ogg:default_library=static',
     'openssl:default_library=static',
@@ -42,9 +46,12 @@ project(
     'id3tag:warning_level=0',
     'lame:werror=false',
     'lame:warning_level=0',
+    'libmicrohttpd:warning_level=0',
+    'libnpupnp:warning_level=0',
+    'libsndfile:warning_level=0',
     'liburing:warning_level=0',
     'sqlite3:warning_level=0',
-    'oggiopus:werror=false',
+    'ogg:werror=false',
     'ogg:warning_level=0',
     'openssl:werror=false',
     'openssl:warning_level=0',
@@ -84,6 +91,11 @@ project(
     'lame:tools=disabled',
     'libmpdclient:documentation=false',
     'libmpdclient:test=false',
+    'libsndfile:examples=false',
+    'libsndfile:external_libs=disabled',
+    'libsndfile:mpeg=disabled',
+    'libsndfile:programs=false',
+    'libsndfile:sndio=disabled',
     'openssl:build_cli=false',
     'openssl:asm=disabled',
     'opus:docs=disabled',
@@ -98,17 +110,17 @@ version_cxx = vcs_tag(input: 'src/GitVersion.cxx', output: 'GitVersion.cxx')
 compiler = meson.get_compiler('cpp')
 c_compiler = meson.get_compiler('c')
 
-if compiler.get_id() == 'gcc' and compiler.version().version_compare('<10')
-  warning('Your GCC version is too old.  You need at least version 10.')
-elif compiler.get_id() == 'clang' and compiler.version().version_compare('<11')
-  warning('Your clang version is too old.  You need at least version 11.')
+if compiler.get_id() == 'gcc' and compiler.version().version_compare('<12')
+  warning('Your GCC version is too old.  You need at least version 12.')
+elif compiler.get_id() == 'clang' and compiler.version().version_compare('<14')
+  warning('Your clang version is too old.  You need at least version 14.')
 endif
 
 version_conf = configuration_data()
 version_conf.set_quoted('PACKAGE', meson.project_name())
 version_conf.set_quoted('PACKAGE_NAME', meson.project_name())
 version_conf.set_quoted('VERSION', meson.project_version())
-version_conf.set_quoted('PROTOCOL_VERSION', '0.24.0')
+version_conf.set_quoted('PROTOCOL_VERSION', '0.25.0')
 configure_file(output: 'Version.h', configuration: version_conf)
 
 conf = configuration_data()
@@ -163,8 +175,11 @@ test_cxxflags = test_common_flags + [
   '-Wmismatched-tags',
   '-Woverloaded-virtual',
   '-Wsign-promo',
+  '-Wsuggest-override',
   '-Wvolatile',
   '-Wvirtual-inheritance',
+
+  '-Wno-missing-field-initializers',
 
   # a vtable without a dtor is just fine
   '-Wno-non-virtual-dtor',
@@ -174,12 +189,6 @@ test_cxxflags = test_common_flags + [
   '-Wheader-hygiene',
   '-Winconsistent-missing-destructor-override',
 ]
-
-if compiler.get_id() != 'gcc' or compiler.version().version_compare('>=9')
-  # The GCC 8 implementation of this flag is buggy: it complains even
-  # if "final" is present, which implies "override".
-  test_cxxflags += '-Wsuggest-override'
-endif
 
 test_cflags = test_common_flags + [
   '-Wmissing-prototypes',
@@ -286,13 +295,7 @@ conf.set('ENABLE_DAEMON', enable_daemon)
 conf.set('HAVE_GETPWNAM_R', compiler.has_function('getpwnam_r'))
 conf.set('HAVE_INITGROUPS', compiler.has_function('initgroups'))
 conf.set('HAVE_FNMATCH', compiler.has_function('fnmatch'))
-
-# Explicitly exclude Windows in this check because
-# https://github.com/mesonbuild/meson/issues/3672 (reported in 2018,
-# still not fixed in 2020) causes Meson to believe it exists, because
-# __builtin_strndup() exists (but strndup() still cannot be used).
-conf.set('HAVE_STRNDUP', not is_windows and compiler.has_function('strndup', prefix: '#define _GNU_SOURCE\n#include <string.h>'))
-
+conf.set('HAVE_STRNDUP', compiler.has_function('strndup', prefix: '#define _GNU_SOURCE\n#include <string.h>'))
 conf.set('HAVE_STRCASESTR', compiler.has_function('strcasestr'))
 
 conf.set('HAVE_PRCTL', is_linux)
@@ -306,12 +309,9 @@ if not get_option('syslog').disabled()
 endif
 
 enable_database = get_option('database')
-conf.set('ENABLE_DATABASE', enable_database)
 
 enable_inotify = get_option('inotify') and is_linux and enable_database
 conf.set('ENABLE_INOTIFY', enable_inotify)
-
-conf.set('ENABLE_DSD', get_option('dsd'))
 
 inc = include_directories(
   'src',
@@ -473,10 +473,13 @@ subdir('src/fs')
 subdir('src/io')
 subdir('src/io/uring')
 subdir('src/system')
+subdir('src/system/linux')
 subdir('src/thread')
 subdir('src/net')
 subdir('src/event')
 subdir('src/win32')
+
+subdir('src/apple')
 
 subdir('src/fs/glue')
 
@@ -494,6 +497,7 @@ subdir('src/lib/expat')
 subdir('src/lib/ffmpeg')
 subdir('src/lib/gcrypt')
 subdir('src/lib/nfs')
+subdir('src/lib/nlohmann_json')
 subdir('src/lib/oss')
 subdir('src/lib/pcre')
 subdir('src/lib/pipewire')
@@ -502,7 +506,6 @@ subdir('src/lib/sndio')
 subdir('src/lib/sqlite')
 subdir('src/lib/systemd')
 subdir('src/lib/upnp')
-subdir('src/lib/yajl')
 
 subdir('src/lib/crypto')
 
@@ -598,7 +601,7 @@ if is_android
   ]
 
   android_abi = get_option('android_abi')
-  install_dir = meson.current_source_dir() / 'android/app/src/main/jnilibs' / android_abi
+  install_dir = meson.current_source_dir() / 'android/app/src/main/jniLibs' / android_abi
 else
   target_type = 'executable'
   target_name = 'mpd'

@@ -34,7 +34,7 @@ static void
 PrintDirectoryURI(Response &r, bool base,
 		  const LightDirectory &directory) noexcept
 {
-	r.Fmt(FMT_STRING("directory: {}\n"),
+	r.Fmt("directory: {}\n",
 	      ApplyBaseFlag(directory.GetPath(), base));
 }
 
@@ -64,10 +64,10 @@ print_playlist_in_directory(Response &r, bool base,
 			    const char *name_utf8) noexcept
 {
 	if (base || directory == nullptr)
-		r.Fmt(FMT_STRING("playlist: {}\n"),
+		r.Fmt("playlist: {}\n",
 		      ApplyBaseFlag(name_utf8, base));
 	else
-		r.Fmt(FMT_STRING("playlist: {}/{}\n"),
+		r.Fmt("playlist: {}/{}\n",
 		      directory, name_utf8);
 }
 
@@ -77,9 +77,9 @@ print_playlist_in_directory(Response &r, bool base,
 			    const char *name_utf8) noexcept
 {
 	if (base || directory == nullptr || directory->IsRoot())
-		r.Fmt(FMT_STRING("playlist: {}\n"), name_utf8);
+		r.Fmt("playlist: {}\n", name_utf8);
 	else
-		r.Fmt(FMT_STRING("playlist: {}/{}\n"),
+		r.Fmt("playlist: {}/{}\n",
 		      directory->GetPath(), name_utf8);
 }
 
@@ -177,28 +177,38 @@ PrintSongUris(Response &r, Partition &partition,
 
 static void
 PrintUniqueTags(Response &r, std::span<const TagType> tag_types,
-		const RecursiveMap<std::string> &map) noexcept
+		const RecursiveMap<std::string> &map,
+		const RangeArg window) noexcept
 {
 	const char *const name = tag_item_names[tag_types.front()];
 	tag_types = tag_types.subspan(1);
 
+	unsigned next_position = 0;
 	for (const auto &[key, tag] : map) {
-		r.Fmt(FMT_STRING("{}: {}\n"), name, key);
+		const unsigned position = next_position++;
+		if (position < window.start)
+			continue;
+		else if (position >= window.end)
+			break;
+
+		r.Fmt("{}: {}\n", name, key);
 
 		if (!tag_types.empty())
-			PrintUniqueTags(r, tag_types, tag);
+			PrintUniqueTags(r, tag_types, tag, RangeArg::All());
 	}
 }
 
 void
 PrintUniqueTags(Response &r, Partition &partition,
 		std::span<const TagType> tag_types,
-		const SongFilter *filter)
+		const SongFilter *filter,
+		const RangeArg window)
 {
 	const Database &db = partition.GetDatabaseOrThrow();
 
 	const DatabaseSelection selection("", true, filter);
 
 	PrintUniqueTags(r, tag_types,
-			db.CollectUniqueTags(selection, tag_types));
+			db.CollectUniqueTags(selection, tag_types),
+			window);
 }

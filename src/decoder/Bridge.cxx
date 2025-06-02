@@ -239,6 +239,10 @@ DecoderBridge::UpdateStreamTag(InputStream *is) noexcept
 		/* discard the song tag; we don't need it */
 		song_tag.reset();
 
+	if (stream_tag && tag && *stream_tag == *tag)
+		/* not changed */
+		return false;
+
 	stream_tag = std::move(tag);
 	return true;
 }
@@ -368,7 +372,7 @@ DecoderBridge::SeekError() noexcept
 }
 
 InputStreamPtr
-DecoderBridge::OpenUri(const char *uri)
+DecoderBridge::OpenUri(std::string_view uri)
 {
 	assert(dc.state == DecoderState::START ||
 	       dc.state == DecoderState::DECODE);

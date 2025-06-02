@@ -5,11 +5,14 @@
 #include "Data.hxx"
 #include "fs/AllocatedPath.hxx"
 #include "fs/Traits.hxx"
+#include "fs/XDG.hxx"
 #include "fs/glue/StandardDirectory.hxx"
 #include "lib/fmt/RuntimeError.hxx"
 #include "util/StringSplit.hxx"
 
 #include <cassert>
+
+using std::string_view_literals::operator""sv;
 
 #ifndef _WIN32
 #include <pwd.h>
@@ -67,29 +70,52 @@ InitPathParser(const ConfigData &config) noexcept
 #endif
 }
 
-AllocatedPath
-ParsePath(const char *path)
-{
-	assert(path != nullptr);
-
 #ifndef _WIN32
-	if (path[0] == '~') {
-		++path;
 
-		if (*path == '\0')
+static AllocatedPath
+GetVariable(std::string_view name)
+{
+	if (name == "HOME"sv)
+		return GetConfiguredHome();
+	else if (name == "XDG_CONFIG_HOME"sv)
+		return GetUserConfigDir();
+	else if (name == "XDG_MUSIC_DIR"sv)
+		return GetUserMusicDir();
+	else if (name == "XDG_CACHE_HOME"sv)
+		return GetUserCacheDir();
+	else if (name == "XDG_RUNTIME_DIR"sv)
+		return GetUserRuntimeDir();
+	else
+		throw FmtRuntimeError("Unknown variable: {:?}", name);
+}
+
+#endif
+
+AllocatedPath
+ParsePath(std::string_view path)
+{
+#ifndef _WIN32
+	if (path.starts_with('~')) {
+		path.remove_prefix(1);
+
+		if (path.empty())
 			return GetConfiguredHome();
 
-		if (*path == '/') {
-			++path;
+		const auto [user, rest] = Split(path, '/');
+		const auto home = user.empty()
+			? GetConfiguredHome()
+			: GetHome(std::string{user}.c_str());
 
-			return GetConfiguredHome() /
-				AllocatedPath::FromUTF8Throw(path);
-		} else {
-			const auto [user, rest] = Split(std::string_view{path}, '/');
+		return home / AllocatedPath::FromUTF8Throw(rest);
+	} else if (path.starts_with('$')) {
+		path.remove_prefix(1);
 
-			return GetHome(std::string{user}.c_str())
-				/ AllocatedPath::FromUTF8Throw(rest);
-		}
+		const auto [name, rest] = Split(path, '/');
+		const auto value = GetVariable(name);
+		if (value.IsNull())
+			throw FmtRuntimeError("No value for variable: {:?}", name);
+
+		return value / AllocatedPath::FromUTF8Throw(rest);
 	} else if (!PathTraitsUTF8::IsAbsolute(path)) {
 		throw FmtRuntimeError("not an absolute path: {:?}", path);
 	} else {

@@ -105,20 +105,17 @@ public:
 	 *
 	 * @param mutex a mutex that is used to protect this object; must be
 	 * locked before calling any of the public methods
-	 * @param cond a cond that gets signalled when the state of
-	 * this object changes; may be nullptr if the caller doesn't want to get
-	 * notifications
 	 * @return an #InputStream object on success
 	 */
 	[[nodiscard]]
-	static InputStreamPtr Open(const char *uri, Mutex &mutex);
+	static InputStreamPtr Open(std::string_view uri, Mutex &mutex);
 
 	/**
 	 * Just like Open(), but waits for the stream to become ready.
 	 * It is a wrapper for Open(), WaitReady() and Check().
 	 */
 	[[nodiscard]]
-	static InputStreamPtr OpenReady(const char *uri, Mutex &mutex);
+	static InputStreamPtr OpenReady(std::string_view uri, Mutex &mutex);
 
 	/**
 	 * Install a new handler.

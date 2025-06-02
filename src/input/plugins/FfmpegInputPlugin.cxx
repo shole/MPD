@@ -12,13 +12,15 @@
 #include "../InputPlugin.hxx"
 #include "util/StringAPI.hxx"
 
+using std::string_view_literals::operator""sv;
+
 class FfmpegInputStream final : public ThreadInputStream {
 	static constexpr std::size_t BUFFER_SIZE = 256 * 1024;
 
 	Ffmpeg::IOContext io;
 
 public:
-	FfmpegInputStream(const char *_uri, Mutex &_mutex)
+	FfmpegInputStream(std::string_view _uri, Mutex &_mutex)
 		:ThreadInputStream("ffmpeg", _uri, _mutex, BUFFER_SIZE)
 	{
 		Start();
@@ -66,14 +68,14 @@ input_ffmpeg_protocols() noexcept
 		if (StringIsEqual(protocol, "hls")) {
 			/* just "hls://" doesn't work, but these do
 			   work: */
-			protocols.emplace("hls+http://");
-			protocols.emplace("hls+https://");
+			protocols.emplace("hls+http://"sv);
+			protocols.emplace("hls+https://"sv);
 			continue;
 		}
 
 		if (protocol_is_whitelisted(protocol)) {
 			std::string schema(protocol);
-			schema.append("://");
+			schema.append("://"sv);
 			protocols.emplace(schema);
 		}
 	}
@@ -82,8 +84,7 @@ input_ffmpeg_protocols() noexcept
 }
 
 static InputStreamPtr
-input_ffmpeg_open(const char *uri,
-		  Mutex &mutex)
+input_ffmpeg_open(std::string_view uri, Mutex &mutex)
 {
 	return std::make_unique<FfmpegInputStream>(uri, mutex);
 }

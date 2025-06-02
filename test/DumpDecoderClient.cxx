@@ -54,7 +54,7 @@ DumpDecoderClient::SeekError() noexcept
 }
 
 InputStreamPtr
-DumpDecoderClient::OpenUri(const char *uri)
+DumpDecoderClient::OpenUri(std::string_view uri)
 {
 	return InputStream::OpenReady(uri, mutex);
 }
@@ -96,7 +96,7 @@ DumpDecoderClient::SubmitTag([[maybe_unused]] InputStream *is,
 	fmt::print(stderr, "TAG: duration={}\n", tag.duration.ToDoubleS());
 
 	for (const auto &i : tag)
-		fmt::print(stderr, "  {}={}\n", tag_item_names[i.type], i.value);
+		fmt::print(stderr, "  {}={:?}\n", tag_item_names[i.type], i.value);
 
 	return GetCommand();
 }

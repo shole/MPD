@@ -12,6 +12,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <utility> // for std::unreachable()
 
 #include <string.h>
 
@@ -49,7 +50,7 @@ PcmVolumeConvert(typename STraits::value_type _sample, int volume) noexcept
 	return result;
 }
 
-template<SampleFormat F, class Traits=SampleTraits<F>>
+template<SampleFormat F, IntegerSampleTraits Traits=SampleTraits<F>>
 static inline typename Traits::value_type
 pcm_volume_sample(PcmDither &dither,
 		  typename Traits::value_type _sample,
@@ -62,7 +63,7 @@ pcm_volume_sample(PcmDither &dither,
 				  Traits::BITS>(sample * volume);
 }
 
-template<SampleFormat F, class Traits=SampleTraits<F>>
+template<SampleFormat F, IntegerSampleTraits Traits=SampleTraits<F>>
 static void
 pcm_volume_change(PcmDither &dither,
 		  typename Traits::pointer dest,
@@ -194,8 +195,7 @@ PcmVolume::Apply(std::span<const std::byte> src) noexcept
 
 	switch (format) {
 	case SampleFormat::UNDEFINED:
-		assert(false);
-		gcc_unreachable();
+		std::unreachable();
 
 	case SampleFormat::S8:
 		pcm_volume_change_8(dither, (int8_t *)data,

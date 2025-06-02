@@ -101,36 +101,11 @@ private:
 
 static constexpr Domain server_socket_domain("server_socket");
 
-static int
-get_remote_uid(int fd)
-{
-#ifdef HAVE_STRUCT_UCRED
-	struct ucred cred;
-	socklen_t len = sizeof (cred);
-
-	if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &cred, &len) < 0)
-		return -1;
-
-	return cred.uid;
-#else
-#ifdef HAVE_GETPEEREID
-	uid_t euid;
-	gid_t egid;
-
-	if (getpeereid(fd, &euid, &egid) == 0)
-		return euid;
-#else
-	(void)fd;
-#endif
-	return -1;
-#endif
-}
-
 inline void
 ServerSocket::OneServerSocket::Accept() noexcept
 {
 	StaticSocketAddress peer_address;
-	UniqueSocketDescriptor peer_fd(event.GetSocket().AcceptNonBlock(peer_address));
+	UniqueSocketDescriptor peer_fd{AdoptTag{}, event.GetSocket().AcceptNonBlock(peer_address)};
 	if (!peer_fd.IsDefined()) {
 		const SocketErrorMessage msg;
 		FmtError(server_socket_domain,
@@ -145,9 +120,7 @@ ServerSocket::OneServerSocket::Accept() noexcept
 			 (const char *)msg);
 	}
 
-	const auto uid = get_remote_uid(peer_fd.Get());
-
-	parent.OnAccept(std::move(peer_fd), peer_address, uid);
+	parent.OnAccept(std::move(peer_fd), peer_address);
 }
 
 void

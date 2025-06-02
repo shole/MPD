@@ -3,12 +3,12 @@
 
 #include "ConfiguredResampler.hxx"
 #include "FallbackResampler.hxx"
+#include "pcm/Features.h" // for ENABLE_LIBSAMPLERATE, ENABLE_SOXR
 #include "config/Data.hxx"
 #include "config/Option.hxx"
 #include "config/Block.hxx"
 #include "config/Param.hxx"
 #include "lib/fmt/RuntimeError.hxx"
-#include "config.h"
 
 #ifdef ENABLE_LIBSAMPLERATE
 #include "LibsamplerateResampler.hxx"
@@ -19,6 +19,7 @@
 #endif
 
 #include <cassert>
+#include <utility> // for std::unreachable()
 
 #include <string.h>
 
@@ -160,5 +161,5 @@ pcm_resampler_create()
 #endif
 	}
 
-	gcc_unreachable();
+	std::unreachable();
 }

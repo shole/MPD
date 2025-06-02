@@ -6,7 +6,8 @@
 #include "PlaylistStream.hxx"
 #include "PlaylistMapper.hxx"
 #include "SongEnumerator.hxx"
-#include "config.h"
+
+#include <utility> // for std::unreachable()
 
 std::unique_ptr<SongEnumerator>
 playlist_open_any(const LocatedUri &located_uri,
@@ -30,5 +31,5 @@ playlist_open_any(const LocatedUri &located_uri,
 				       mutex);
 	}
 
-	gcc_unreachable();
+	std::unreachable();
 }

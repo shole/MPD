@@ -47,6 +47,18 @@ public:
 		event.Close();
 	}
 
+	unsigned GetScheduledFlags() const noexcept {
+		return event.GetScheduledFlags();
+	}
+
+	unsigned GetReadyFlags() const noexcept {
+		return event.GetReadyFlags();
+	}
+
+	void SetReadyFlags(unsigned flags) noexcept {
+		event.SetReadyFlags(flags);
+	}
+
 	bool Schedule(unsigned flags) noexcept {
 		return event.Schedule(flags);
 	}
@@ -69,6 +81,14 @@ public:
 
 	void CancelWrite() noexcept {
 		event.CancelWrite();
+	}
+
+	void CancelOnlyRead() noexcept {
+		event.CancelOnlyRead();
+	}
+
+	void CancelOnlyWrite() noexcept {
+		event.CancelOnlyWrite();
 	}
 
 	void ScheduleImplicit() noexcept {

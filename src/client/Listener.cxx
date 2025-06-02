@@ -4,14 +4,15 @@
 #include "Listener.hxx"
 #include "Client.hxx"
 #include "Permission.hxx"
+#include "net/Features.hxx" // for HAVE_TCP, HAVE_UN
+#include "net/PeerCredentials.hxx"
 #include "net/UniqueSocketDescriptor.hxx"
 #include "net/SocketAddress.hxx"
-#include "config.h"
 
 static unsigned
-GetPermissions(SocketAddress address, int uid) noexcept
+GetPermissions(SocketAddress address, const SocketPeerCredentials cred) noexcept
 {
-	(void)uid; // TODO: implement option to derive permissions from uid
+	(void)cred; // TODO: implement option to derive permissions from uid
 
 #ifdef HAVE_UN
 	if (address.GetFamily() == AF_LOCAL)
@@ -29,10 +30,11 @@ GetPermissions(SocketAddress address, int uid) noexcept
 
 void
 ClientListener::OnAccept(UniqueSocketDescriptor fd,
-			 SocketAddress address, int uid) noexcept
+			 SocketAddress address) noexcept
 {
+	const auto cred = fd.GetPeerCredentials();
 
 	client_new(GetEventLoop(), partition,
-		   std::move(fd), address, uid,
-		   GetPermissions(address, uid));
+		   std::move(fd), address, cred,
+		   GetPermissions(address, cred));
 }

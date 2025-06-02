@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright The Music Player Daemon Project
 
-#ifndef QOBUZ_TAG_SCANNER
-#define QOBUZ_TAG_SCANNER
+#pragma once
 
-#include "lib/curl/Delegate.hxx"
 #include "lib/curl/Request.hxx"
+#include "lib/curl/StringHandler.hxx"
 #include "input/RemoteTagScanner.hxx"
 
 class QobuzClient;
 
 class QobuzTagScanner final
-	: public RemoteTagScanner, DelegateCurlResponseHandler
+	: public RemoteTagScanner, StringCurlResponseHandler
 {
 	CurlRequest request;
 
@@ -21,7 +20,7 @@ public:
 	class ResponseParser;
 
 	QobuzTagScanner(QobuzClient &client,
-			const char *track_id,
+			std::string_view track_id,
 			RemoteTagHandler &_handler);
 
 	~QobuzTagScanner() noexcept override;
@@ -31,13 +30,7 @@ public:
 	}
 
 private:
-	/* virtual methods from DelegateCurlResponseHandler */
-	std::unique_ptr<CurlResponseParser> MakeParser(unsigned status,
-						       Curl::Headers &&headers) override;
-	void FinishParser(std::unique_ptr<CurlResponseParser> p) override;
-
 	/* virtual methods from CurlResponseHandler */
+	void OnEnd() override;
 	void OnError(std::exception_ptr e) noexcept override;
 };
-
-#endif

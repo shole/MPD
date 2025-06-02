@@ -9,7 +9,7 @@
 #include <string.h>
 
 ThreadInputStream::ThreadInputStream(const char *_plugin,
-				     const char *_uri,
+				     std::string_view _uri,
 				     Mutex &_mutex,
 				     size_t _buffer_size) noexcept
 	:InputStream(_uri, _mutex),
@@ -149,6 +149,23 @@ ThreadInputStream::Seek([[maybe_unused]] std::unique_lock<Mutex> &lock,
 	wake_cond.notify_one();
 }
 
+inline std::size_t
+ThreadInputStream::ReadFromBuffer(std::span<std::byte> dest) noexcept
+{
+	const size_t nbytes = buffer.MoveTo(dest);
+	if (nbytes == 0)
+		return 0;
+
+	if (buffer.empty())
+		/* when the buffer becomes empty, reset its head and
+		   tail so the next write can fill the whole buffer
+		   and not just the part after the tail */
+		buffer.Clear();
+
+	offset += (offset_type)nbytes;
+	return nbytes;
+}
+
 size_t
 ThreadInputStream::Read(std::unique_lock<Mutex> &lock,
 			std::span<std::byte> dest)
@@ -164,13 +181,8 @@ ThreadInputStream::Read(std::unique_lock<Mutex> &lock,
 			continue;
 		}
 
-		auto r = buffer.Read();
-		if (!r.empty()) {
-			size_t nbytes = std::min(dest.size(), r.size());
-			memcpy(dest.data(), r.data(), nbytes);
-			buffer.Consume(nbytes);
+		if (std::size_t nbytes = ReadFromBuffer(dest); nbytes > 0) {
 			wake_cond.notify_one();
-			offset += nbytes;
 			return nbytes;
 		}
 

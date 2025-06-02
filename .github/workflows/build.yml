@@ -3,6 +3,11 @@ on:
   workflow_dispatch:
   push:
     paths-ignore:
+      - 'AUTHORS'
+      - 'COPYING'
+      - 'LICENSES/**'
+      - 'NEWS'
+      - 'README.md'
       - 'android/**'
       - 'build/**'
       - 'doc/**'
@@ -12,9 +17,14 @@ on:
       - 'win32/**'
     branches:
       - master
-      - v0.23.x
+      - v0.24.x
   pull_request:
     paths-ignore:
+      - 'AUTHORS'
+      - 'COPYING'
+      - 'LICENSES/**'
+      - 'NEWS'
+      - 'README.md'
       - 'android/**'
       - 'build/**'
       - 'doc/**'
@@ -24,7 +34,7 @@ on:
       - 'win32/**'
     branches:
       - master
-      - v0.23.x
+      - v0.24.x
 
 permissions:
   contents: read #  to fetch code (actions/checkout)
@@ -33,7 +43,7 @@ jobs:
   build-linux:
     strategy:
       matrix:
-        compiler: [gcc14, gcc10, clang]
+        compiler: [gcc14, gcc12, clang]
         include:
           - compiler: gcc14
             os: ubuntu-24.04
@@ -41,11 +51,11 @@ jobs:
             cxx: g++-14
             packages: g++-14
             meson_options:
-          - compiler: gcc10
+          - compiler: gcc12
             os: ubuntu-24.04
-            cc: gcc-10
-            cxx: g++-10
-            packages: g++-10
+            cc: gcc-12
+            cxx: g++-12
+            packages: g++-12
             meson_options:
           - compiler: clang
             os: ubuntu-24.04
@@ -71,6 +81,7 @@ jobs:
             ${{ matrix.packages }} \
             meson \
             ccache \
+            nlohmann-json3-dev \
             libfmt-dev \
             libgtest-dev \
             libpcre2-dev \
@@ -90,7 +101,7 @@ jobs:
             libsamplerate0-dev libsoxr-dev \
             libbz2-dev libcdio-paranoia-dev libiso9660-dev libmms-dev \
             libzzip-dev \
-            libyajl-dev libexpat-dev \
+            libexpat-dev \
             libasound2-dev libao-dev libjack-jackd2-dev libopenal-dev \
             libpulse-dev libshout3-dev \
             libsndio-dev \
@@ -102,9 +113,9 @@ jobs:
             libgcrypt20-dev
 
       - id: cache-ccache
-        uses: hendrikmuhs/ccache-action@v1
+        uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: ${{ matrix.compiler }}
+          key: ${{ matrix.os }}-${{ matrix.compiler }}
 
       - name: Configure
         run: |
@@ -121,7 +132,108 @@ jobs:
         run: meson compile -C output/full --verbose
 
       - name: Unit Tests
-        run: meson test -C output/full
+        run: meson test -C output/full --print-errorlogs
+
+      - name: Configure Mini
+        run: |
+          meson setup \
+            -Dbuildtype=minsize \
+            -Dauto_features=disabled \
+            -Dtest=true \
+            -Ddaemon=false \
+            -Dinotify=false -Depoll=false -Deventfd=false \
+            -Dsignalfd=false \
+            -Dtcp=false \
+            -Ddsd=false \
+            -Ddatabase=false \
+            -Dneighbor=false \
+            -Dnlohmann_json=enabled \
+            -Dcue=false \
+            -Dfifo=false \
+            -Dhttpd=false -Dpipe=false -Drecorder=false \
+            -Dsnapcast=false \
+            --wrap-mode nofallback \
+            ${{ matrix.meson_options }} \
+            output/mini
+
+      - name: Build Mini
+        run: meson compile -C output/mini --verbose
+
+      - name: Unit Tests Mini
+        run: meson test -C output/mini --print-errorlogs
+
+  build-macos:
+    strategy:
+      matrix:
+        compiler: [clang]
+        include:
+          - compiler: clang
+            os: macos-latest
+            cc: clang
+            cxx: clang++
+            brew_packages: >
+              meson ninja
+              pkgconf
+              ccache
+              expat
+              fmt
+              googletest
+              pcre2
+              icu4c
+              ffmpeg
+              libnfs
+              libupnp
+              libid3tag
+              chromaprint
+              libsamplerate
+              libsoxr
+              flac
+              nlohmann-json
+              opus
+              libvorbis
+              faad2
+              sqlite
+              wavpack
+              libmpdclient
+            meson_options: --force-fallback-for=fmt,gtest
+
+    runs-on: ${{ matrix.os }}
+
+    env:
+      CC: ccache ${{ matrix.cc }}
+      CXX: ccache ${{ matrix.cxx }}
+
+    steps:
+      - id: checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew update
+          brew install \
+            ${{ matrix.brew_packages }}
+
+      - id: cache-ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ matrix.os }}-${{ matrix.compiler }}
+
+      - name: Configure
+        run: |
+          meson setup \
+            -Ddocumentation=disabled \
+            -Dnlohmann_json=enabled \
+            -Dtest=true \
+            -Dpcre=enabled \
+            --wrap-mode nofallback \
+            ${{ matrix.meson_options }} \
+            output/full
+
+      - name: Build
+        run: meson compile -C output/full --verbose
+
+      - name: Unit Tests
+        run: meson test -C output/full --print-errorlogs
 
       - name: Configure Mini
         run: |
@@ -148,7 +260,7 @@ jobs:
         run: meson compile -C output/mini --verbose
 
       - name: Unit Tests Mini
-        run: meson test -C output/mini
+        run: meson test -C output/mini --print-errorlogs
 
   build-msys2:
     strategy:
@@ -167,6 +279,7 @@ jobs:
           msystem: ${{matrix.platform}}
           pacboy: >-
             cc:p
+            ccache:p
             cmake:p
             dbus:p
             faad2:p
@@ -186,14 +299,42 @@ jobs:
             libsoxr:p
             libvorbis:p
             meson:p
+            nlohmann-json:p
             ninja:p
             opus:p
             pulseaudio:p
             shine:p
             twolame:p
-            yajl:p
 
-      - name: Compile and Test
+      - id: cache-ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ matrix.platform }}
+
+      - name: Configure
         run: |
-          meson setup "${{github.workspace}}/build" -Dbzip2=disabled -Dcdio_paranoia=disabled -Dchromaprint=disabled -Ddocumentation=disabled -Dfluidsynth=disabled -Dicu=disabled -Diso9660=disabled -Dmikmod=disabled -Dmpg123=disabled -Dnfs=disabled -Dsidplay=disabled -Dudisks=disabled -Dupnp=disabled -Dwavpack=disabled -Dzzip=disabled -Dtest=true -Dwarning_level=3
-          meson compile -C "${{github.workspace}}/build" --verbose
+          meson setup \
+            -Dbzip2=disabled \
+            -Dcdio_paranoia=disabled \
+            -Dchromaprint=disabled \
+            -Ddocumentation=disabled \
+            -Dfluidsynth=disabled \
+            -Dicu=disabled \
+            -Diso9660=disabled \
+            -Dmikmod=disabled \
+            -Dmpg123=disabled \
+            -Dnfs=disabled \
+            -Dnlohmann_json=enabled \
+            -Dsidplay=disabled \
+            -Dudisks=disabled \
+            -Dupnp=disabled \
+            -Dwavpack=disabled \
+            -Dzzip=disabled \
+            -Dtest=true \
+            "${{github.workspace}}/build"
+
+      - name: Build
+        run: meson compile -C "${{github.workspace}}/build" --verbose
+
+      - name: Unit Tests
+        run: meson test -C "${{github.workspace}}/build" --print-errorlogs

@@ -131,6 +131,32 @@ class AudioOutputControl {
 	} command = Command::NONE;
 
 	/**
+	 * The current state of #source (an #AudioOutputSource
+	 * object).  This is used to keep track of whether it needs to
+	 * be (re)initialized.
+	 */
+	enum class SourceState : uint_least8_t {
+		/**
+		 * #source is closed and cannot be used.
+		 * InternalOpen() will open it once #Command::OPEN
+		 * gets received.
+		 */
+		CLOSED,
+
+		/**
+		 * #source is open and usable.
+		 */
+		OPEN,
+
+		/**
+		 * #source is open, but has been flushed (via
+		 * InternalDrain() / Command::DRAIN).  It cannot be
+		 * used until it is reopened.
+		 */
+		FLUSHED,
+	} source_state = SourceState::CLOSED;
+
+	/**
 	 * Will this output receive tags from the decoder?  The
 	 * default is true, but it may be configured to false to
 	 * suppress sending tags to the output.
@@ -182,6 +208,15 @@ class AudioOutputControl {
 	 * ao_pause() loop.
 	 */
 	bool pause = false;
+
+	/**
+	 * Should the device be reopened?  This is set to true after
+	 * the #AudioOutputSource got flushed because reopening is
+	 * necessary after a flush.
+	 *
+	 * Protected by #mutex.
+	 */
+	bool should_reopen = false;
 
 	/**
 	 * When this flag is set, the output thread will not do any
@@ -436,7 +471,7 @@ public:
 	/**
 	 * Caller must lock the mutex.
 	 */
-	bool Open(std::unique_lock<Mutex> &lock,
+	bool Open(std::unique_lock<Mutex> &&lock,
 		  AudioFormat audio_format, const MusicPipe &mp) noexcept;
 
 	/**

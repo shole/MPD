@@ -4,6 +4,7 @@
 #pragma once
 
 #include "BackendEvents.hxx"
+#include "event/Features.h" // for USE_EPOLL
 #include "net/SocketDescriptor.hxx"
 #include "util/BindMethod.hxx"
 #include "util/IntrusiveList.hxx"
@@ -118,6 +119,10 @@ public:
 		ready_flags = flags;
 	}
 
+	void ClearReadyFlags(unsigned flags) noexcept {
+		ready_flags &= ~flags;
+	}
+
 	/**
 	 * @return true on success, false on error (with errno set if
 	 * USE_EPOLL is defined)
@@ -149,11 +154,39 @@ public:
 	}
 
 	/**
+	 * Like CancelRead(), but leave IMPLICIT_FLAGS scheduled (do
+	 * not schedule them if nothing is scheduled currently).
+	 */
+	void CancelOnlyRead() noexcept {
+		Schedule(GetScheduledFlags() & ~READ);
+	}
+
+	/**
+	 * Like CancelWrite(), but leave IMPLICIT_FLAGS scheduled (do
+	 * not schedule them if nothing is scheduled currently).
+	 */
+	void CancelOnlyWrite() noexcept {
+		Schedule(GetScheduledFlags() & ~WRITE);
+	}
+
+	/**
 	 * Schedule only the #IMPLICIT_FLAGS without #READ and #WRITE.
 	 */
 	void ScheduleImplicit() noexcept {
 		Schedule(IMPLICIT_FLAGS);
 	}
+
+#ifdef USE_EPOLL
+	/**
+	 * Cancel READ but schedule READ_HANGUP.  This is useful to be
+	 * able to detect hangup while we're not interested in reading
+	 * further data from the socket; in that case, the Linux
+	 * kernel will not report HANGUP.
+	 */
+	void CancelReadAndScheduleReadHangup() noexcept {
+		Schedule((GetScheduledFlags() & ~READ) | READ_HANGUP);
+	}
+#endif
 
 	bool IsReadPending() const noexcept {
 		return GetScheduledFlags() & READ;

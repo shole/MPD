@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright The Music Player Daemon Project
 
-#include "config.h"
 #include "LocateUri.hxx"
 #include "Length.hxx"
 #include "PlaylistAny.hxx"
@@ -10,6 +9,7 @@
 #include "SongPrint.hxx"
 #include "song/DetachedSong.hxx"
 #include "song/LightSong.hxx"
+#include "db/Features.hxx" // for ENABLE_DATABASE
 #include "input/Error.hxx"
 #include "fs/Traits.hxx"
 #include "thread/Mutex.hxx"
@@ -43,9 +43,9 @@ playlist_provider_length(Response &r,
 			playtime += get_duration(*song);
 		i++;
 	}
-	r.Fmt(FMT_STRING("songs: {}\n"), i);
+	r.Fmt("songs: {}\n", i);
 	const auto seconds = std::chrono::round<std::chrono::seconds>(playtime);
-	r.Fmt(FMT_STRING("playtime: {}\n"), seconds.count());
+	r.Fmt("playtime: {}\n", seconds.count());
 }
 
 void

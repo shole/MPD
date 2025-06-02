@@ -15,6 +15,11 @@ Queue::Queue(unsigned entries, unsigned flags)
 {
 }
 
+Queue::Queue(unsigned entries, struct io_uring_params &params)
+	:ring(entries, params)
+{
+}
+
 Queue::~Queue() noexcept
 {
 	operations.clear_and_dispose(DeleteDisposer{});
@@ -46,17 +51,25 @@ Queue::AddPending(struct io_uring_sqe &sqe,
 	io_uring_sqe_set_data(&sqe, c);
 }
 
-void
-Queue::DispatchOneCompletion(struct io_uring_cqe &cqe) noexcept
+inline void
+Queue::_DispatchOneCompletion(const struct io_uring_cqe &cqe) noexcept
 {
 	void *data = io_uring_cqe_get_data(&cqe);
 	if (data != nullptr) {
 		auto *c = (CancellableOperation *)data;
-		c->OnUringCompletion(cqe.res);
-		c->unlink();
-		delete c;
+		const bool more = cqe.flags & IORING_CQE_F_MORE;
+		c->OnUringCompletion(cqe.res, more);
+		if (!more) {
+			c->unlink();
+			delete c;
+		}
 	}
+}
 
+void
+Queue::DispatchOneCompletion(struct io_uring_cqe &cqe) noexcept
+{
+	_DispatchOneCompletion(cqe);
 	ring.SeenCompletion(cqe);
 }
 
@@ -71,6 +84,14 @@ Queue::DispatchOneCompletion()
 	return true;
 }
 
+inline unsigned
+Queue::DispatchCompletions(struct io_uring_cqe &_cqe) noexcept
+{
+	return ring.VisitCompletions(&_cqe, [](const struct io_uring_cqe &cqe){
+		_DispatchOneCompletion(cqe);
+	});
+}
+
 bool
 Queue::WaitDispatchOneCompletion()
 {
@@ -80,6 +101,16 @@ Queue::WaitDispatchOneCompletion()
 
 	DispatchOneCompletion(*cqe);
 	return true;
+}
+
+bool
+Queue::SubmitAndWaitDispatchCompletions(struct __kernel_timespec *timeout)
+{
+	auto *cqe = ring.SubmitAndWaitCompletion(timeout);
+	if (cqe == nullptr)
+		return false;
+
+	return DispatchCompletions(*cqe) > 0;
 }
 
 } // namespace Uring

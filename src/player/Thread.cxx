@@ -786,6 +786,11 @@ Player::ProcessCommand(std::unique_lock<Mutex> &lock) noexcept
 
 		queued = true;
 		pc.CommandFinished();
+
+		if (!decoder_starting && dc.IsIdle())
+			StartDecoder(lock, std::make_shared<MusicPipe>(),
+				     false);
+
 		break;
 
 	case PlayerCommand::PAUSE:
@@ -904,13 +909,15 @@ PlayerControl::LockUpdateSongTag(DetachedSong &song,
 		   streams may change tags dynamically */
 		return;
 
-	song.SetTag(new_tag);
+	if (new_tag != song.GetTag()) {
+		song.SetTag(new_tag);
 
-	LockSetTaggedSong(song);
+		LockSetTaggedSong(song);
 
-	/* the main thread will update the playlist version when he
-	   receives this event */
-	listener.OnPlayerTagModified();
+		/* the main thread will update the playlist version when he
+		   receives this event */
+		listener.OnPlayerTagModified();
+	}
 }
 
 inline void
@@ -1081,7 +1088,10 @@ Player::SongBorder() noexcept
 
 	const bool border_pause = pc.ApplyBorderPause();
 	if (border_pause) {
+		const ScopeUnlock unlock(pc.mutex);
+
 		paused = true;
+
 		pc.listener.OnBorderPause();
 
 		/* drain all outputs to guarantee the current song is

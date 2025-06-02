@@ -156,6 +156,9 @@ fails, no more commands are executed and the appropriate
 ``list_OK`` is returned for each
 successful command executed in the command list.
 
+Only synchronous commands can be used in command lists.  Commands that
+suspend execution (``idle`` and ``noidle``) are not allowed.
+
 Ranges
 ======
 
@@ -1196,7 +1199,7 @@ The music database
 
 .. _command_list:
 
-:command:`list {TYPE} {FILTER} [group {GROUPTYPE}]`
+:command:`list {TYPE} {FILTER} [group {GROUPTYPE}] [window {START:END}]`
     Lists unique tags values of the specified type.
     ``TYPE`` can be any tag supported by
     :program:`MPD`.
@@ -1209,6 +1212,9 @@ The music database
     grouped by their respective (album) artist::
 
      list album group albumartist
+
+    ``window`` works like in :ref:`find <command_find>`.  In this
+    command, it affects only the top-most tag type. [#since_0_25]_
 
     ``list file`` was implemented in an early :program:`MPD` version,
     but does not appear to make a lot of sense.  It still works (to
@@ -1942,3 +1948,4 @@ client-to-client messages are local to the current partition.
 .. [#since_0_23_4] Since :program:`MPD` 0.23.4
 .. [#since_0_23_5] Since :program:`MPD` 0.23.5
 .. [#since_0_24] Since :program:`MPD` 0.24
+.. [#since_0_25] Since :program:`MPD` 0.25

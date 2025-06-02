@@ -57,8 +57,8 @@ and unpack it (or `clone the git repository
 
 In any case, you need:
 
-* a C++20 compiler (e.g. GCC 10 or clang 11)
-* `Meson 1.0 <http://mesonbuild.com/>`__ and `Ninja
+* a C++23 compiler (e.g. GCC 12 or clang 14)
+* `Meson 1.2 <http://mesonbuild.com/>`__ and `Ninja
   <https://ninja-build.org/>`__
 * pkg-config 
 
@@ -84,7 +84,8 @@ dependencies on Debian Bookworm:
       libsamplerate0-dev libsoxr-dev \
       libbz2-dev libcdio-paranoia-dev libiso9660-dev libmms-dev \
       libzzip-dev \
-      libcurl4-gnutls-dev libyajl-dev libexpat1-dev \
+      libcurl4-gnutls-dev libexpat1-dev \
+      nlohmann-json3-dev \
       libasound2-dev libao-dev libjack-jackd2-dev libopenal-dev \
       libpulse-dev libshout3-dev \
       libsndio-dev \
@@ -161,7 +162,7 @@ This section is about the latter.
 You need:
 
 * `mingw-w64 <http://mingw-w64.org/doku.php>`__
-* `Meson 0.56.0 <http://mesonbuild.com/>`__ and `Ninja
+* `Meson 1.2 <http://mesonbuild.com/>`__ and `Ninja
   <https://ninja-build.org/>`__
 * cmake
 * pkg-config
@@ -201,7 +202,7 @@ You need:
 
 * Android SDK (sdk platform 34, build tools 34.0.0)
 * `Android NDK r27 <https://developer.android.com/ndk/downloads>`_
-* `Meson 0.56.0 <http://mesonbuild.com/>`__ and `Ninja
+* `Meson 1.2 <http://mesonbuild.com/>`__ and `Ninja
   <https://ninja-build.org/>`__
 * cmake
 * pkg-config
@@ -223,11 +224,16 @@ tarball and change into the directory.  Then, instead of
    -Dwrap_mode=forcefallback \
    -Dandroid_debug_keystore=$HOME/.android/debug.keystore
  cd ../../android
- ./gradlew assembleDebug
+ ./gradlew assemble{ABI}Debug
+
+In the argument to `gradlew`, replace `{ABI}` with the build ABI or `Universal`.
+The `productFlavor` names defined in `build.android.kts` match the ABI.
+A universal apk (includes both arm64-v8a and x86_64)
+
 
 :envvar:`SDK_PATH` is the absolute path where you installed the
 Android SDK; :envvar:`NDK_PATH` is the Android NDK installation path;
-ABI is the Android ABI to be built, e.g. ":code:`arm64-v8a`".
+ABI is the Android ABI to be built, e.g. ":code:`x86`, `x86_64`, `armeabi`, `armeabi-v7a`, `arm64-v8a`".
 
 This downloads various library sources, and then configures and builds :program:`MPD`. 
 
@@ -245,9 +251,17 @@ Each line in the configuration file contains a setting name and its value, e.g.:
 
 Lines starting with ``#`` are treated as comments and ignored.
 
-For settings which specify a filesystem path, the tilde is expanded:
+For settings that specify a file system path, the tilde ('~') is expanded to $HOME. In addition, the following path expansions are supported:
+
+- `$HOME`
+- `$XDG_CONFIG_HOME`
+- `$XDG_MUSIC_DIR`
+- `$XDG_CACHE_HOME`
+- `$XDG_RUNTIME_DIR`
 
 :code:`music_directory "~/Music"`
+
+:code:`db_file "$XDG_CONFIG_HOME/mpd/database"`
 
 Some of the settings are grouped in blocks with curly braces, e.g. per-plugin settings:
 
@@ -491,11 +505,7 @@ More information can be found in the :ref:`encoder_plugins` reference.
 Configuring audio outputs
 -------------------------
 
-Audio outputs are devices which actually play the audio chunks
-produced by :program:`MPD`. You can configure any number of audio
-output devices, but there must be at least one. If none is configured,
-:program:`MPD` attempts to auto-detect. Usually, this works quite well
-with ALSA and OSS.
+Audio outputs are devices which actually play the audio chunks produced by :program:`MPD`. You can configure any number of audio output devices, but there must be at least one. If none is configured, :program:`MPD` attempts to auto-detect. Usually, this works quite well with ALSA, OSS and on Mac OS X.
 
 To configure an audio output manually, add one or more
 :code:`audio_output` blocks to :file:`mpd.conf`:
@@ -794,6 +804,10 @@ brackets if you want to configure a port::
 
  bind_to_address "[::1]:6602"
 
+To reset the previous assignments just set an empty value:
+
+ bind_to_address
+
 To bind to a local socket (UNIX domain socket), specify an absolute
 path or a path starting with a tilde (~).  Some clients default to
 connecting to :file:`/run/mpd/socket` so this may be a good
@@ -965,7 +979,7 @@ Do not change these unless you know what you are doing.
 Zeroconf
 ^^^^^^^^
 
-If Zeroconf support (`Avahi <http://avahi.org/>`_
+If Zeroconf support (`Avahi <http://avahi.org/>`_ or Apple's Bonjour)
 was enabled at compile time with :code:`-Dzeroconf=...`,
 :program:`MPD` can announce its presence on the network. The following
 settings control this feature:
@@ -1205,8 +1219,11 @@ Mounting is only possible with the simple database plugin and a :code:`cache_dir
 
     database {
       plugin "simple"
-      path "~/.mpd/db"
-      cache_directory "~/.mpd/cache"
+      path "$XDG_CACHE_HOME/mpd/database"
+      cache_directory "$XDG_CACHE_HOME/mpd/"
+      # or you can also use relative or absolute paths
+      # path "~/.mpd/db"
+      # cache_directory "~/.mpd/cache"
     }
         
 This requires migrating from the old :code:`db_file` setting to a database section. The cache directory must exist, and :program:`MPD` will put one file per mount there, which will be reused when the same storage is used again later.
@@ -1391,6 +1408,10 @@ from io_uring's advantages.
 * "Cannot allocate memory" usually means that your memlock limit
   (``ulimit -l`` in bash or ``LimitMEMLOCK`` in systemd) is too low.
   64 MB is a reasonable value for this limit.
+* "Permission denied" on a system with SELinux enabled may mean
+  that MPD is restricted from using the io_uring facility. You
+  should also see an AVC denial reported by SELinux. A policy
+  adjustment will be necessary to give MPD access to io_uring.
 * Your Linux kernel might be too old and does not support io_uring.
 
 Error "bind to '0.0.0.0:6600' failed (continuing anyway, because binding to '[::]:6600' succeeded)"

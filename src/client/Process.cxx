@@ -36,6 +36,13 @@ Client::ProcessCommandList(bool list_ok,
 	return CommandResult::OK;
 }
 
+[[gnu::pure]]
+static bool
+IsAsyncCommmand(const char *line) noexcept
+{
+	return StringIsEqual(line, "idle") || StringIsEqual(line, "noidle");
+}
+
 CommandResult
 Client::ProcessLine(char *line) noexcept
 {
@@ -47,7 +54,14 @@ Client::ProcessLine(char *line) noexcept
 		   request */
 		FmtWarning(client_domain,
 			   "[{}] malformed command {:?}",
-			   num, line);
+			   name, line);
+		return CommandResult::CLOSE;
+	}
+
+	if (cmd_list.IsActive() && IsAsyncCommmand(line)) {
+		FmtWarning(client_domain,
+			   "[{}] not possible in comand list: {:?}",
+			   name, line);
 		return CommandResult::CLOSE;
 	}
 
@@ -68,17 +82,15 @@ Client::ProcessLine(char *line) noexcept
 		   except "noidle" */
 		FmtWarning(client_domain,
 			   "[{}] command {:?} during idle",
-			   num, line);
+			   name, line);
 		return CommandResult::CLOSE;
 	}
 
 	if (cmd_list.IsActive()) {
 		if (StringIsEqual(line, CLIENT_LIST_MODE_END)) {
-			const unsigned id = num;
-
 			FmtDebug(client_domain,
 				 "[{}] process command list",
-				 id);
+				 name);
 
 			const bool ok_mode = cmd_list.IsOKMode();
 			auto list = cmd_list.Commit();
@@ -88,7 +100,7 @@ Client::ProcessLine(char *line) noexcept
 						      std::move(list));
 			FmtDebug(client_domain,
 				 "[{}] process command "
-				 "list returned {}", id, unsigned(ret));
+				 "list returned {}", name, unsigned(ret));
 
 			if (ret == CommandResult::OK)
 				WriteOK();
@@ -99,7 +111,7 @@ Client::ProcessLine(char *line) noexcept
 				FmtWarning(client_domain,
 					   "[{}] command list size "
 					   "is larger than the max ({})",
-					   num, client_max_command_list_size);
+					   name, client_max_command_list_size);
 				return CommandResult::CLOSE;
 			}
 
@@ -113,15 +125,13 @@ Client::ProcessLine(char *line) noexcept
 			cmd_list.Begin(true);
 			return CommandResult::OK;
 		} else {
-			const unsigned id = num;
-
 			FmtDebug(client_domain,
 				 "[{}] process command {:?}",
-				 id, line);
+				 name, line);
 			auto ret = command_process(*this, 0, line);
 			FmtDebug(client_domain,
 				 "[{}] command returned {}",
-				 id, unsigned(ret));
+				 name, unsigned(ret));
 
 			if (IsExpired())
 				return CommandResult::CLOSE;

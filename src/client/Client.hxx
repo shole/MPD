@@ -8,6 +8,7 @@
 #include "ProtocolFeature.hxx"
 #include "command/CommandResult.hxx"
 #include "command/CommandListBuilder.hxx"
+#include "db/Features.hxx" // for ENABLE_DATABASE
 #include "input/LastInputStream.hxx"
 #include "tag/Mask.hxx"
 #include "event/FullyBufferedSocket.hxx"
@@ -21,6 +22,7 @@
 #include <string>
 
 class SocketAddress;
+class SocketPeerCredentials;
 class UniqueSocketDescriptor;
 class EventLoop;
 class Path;
@@ -38,6 +40,8 @@ class Client final
 	friend struct ClientPerPartitionListHook;
 	friend class ClientList;
 
+	const std::string name;
+
 	IntrusiveListHook<> list_siblings, partition_siblings;
 
 	CoarseTimerEvent timeout_event;
@@ -50,8 +54,6 @@ class Client final
 	const int uid;
 
 	CommandListBuilder cmd_list;
-
-	const unsigned int num;	/* client number */
 
 	/** is this client waiting for an "idle" response? */
 	bool idle_waiting = false;
@@ -121,7 +123,7 @@ public:
 	Client(EventLoop &loop, Partition &partition,
 	       UniqueSocketDescriptor fd, int uid,
 	       unsigned _permission,
-	       int num) noexcept;
+	       std::string &&_name) noexcept;
 
 	~Client() noexcept;
 
@@ -300,5 +302,6 @@ struct ClientPerPartitionListHook
 
 void
 client_new(EventLoop &loop, Partition &partition,
-	   UniqueSocketDescriptor fd, SocketAddress address, int uid,
+	   UniqueSocketDescriptor fd, SocketAddress address,
+	   SocketPeerCredentials cred,
 	   unsigned permission) noexcept;

@@ -13,6 +13,7 @@
 #include <cassert>
 #include <set>
 #include <string>
+#include <utility> // for std::unreachable()
 
 CommandResult
 handle_subscribe(Client &client, Request args, Response &r)
@@ -37,9 +38,7 @@ handle_subscribe(Client &client, Request args, Response &r)
 		return CommandResult::ERROR;
 	}
 
-	/* unreachable */
-	assert(false);
-	gcc_unreachable();
+	std::unreachable();
 }
 
 CommandResult
@@ -70,7 +69,7 @@ handle_channels(Client &client, [[maybe_unused]] Request args, Response &r)
 	}
 
 	for (const auto &channel : channels)
-		r.Fmt(FMT_STRING("channel: {}\n"), channel);
+		r.Fmt("channel: {}\n", channel);
 
 	return CommandResult::OK;
 }
@@ -82,7 +81,7 @@ handle_read_messages(Client &client,
 	assert(args.empty());
 
 	client.ConsumeMessages([&r](const auto &msg){
-		r.Fmt(FMT_STRING("channel: {}\nmessage: {}\n"),
+		r.Fmt("channel: {}\nmessage: {}\n",
 		      msg.GetChannel(), msg.GetMessage());
 	});
 

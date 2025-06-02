@@ -36,8 +36,8 @@ libmodplug = AutotoolsProject(
 )
 
 libopenmpt = AutotoolsProject(
-    'https://lib.openmpt.org/files/libopenmpt/src/libopenmpt-0.7.9+release.autotools.tar.gz',
-    '0386e918d75d797e79d5b14edd0847165d8b359e9811ef57652c0a356a2dfcf4',
+    'https://lib.openmpt.org/files/libopenmpt/src/libopenmpt-0.7.13+release.autotools.tar.gz',
+    'dcd7cde4f9c498eb496c4556e1c1b81353e2a74747e8270a42565117ea42e1f1',
     'lib/libopenmpt.a',
     [
         '--disable-shared', '--enable-static',
@@ -49,7 +49,7 @@ libopenmpt = AutotoolsProject(
         '--without-portaudio', '--without-portaudiocpp', '--without-sndfile',
         '--without-flac',
     ],
-    base='libopenmpt-0.7.9+release.autotools',
+    base='libopenmpt-0.7.13+release.autotools',
 )
 
 wildmidi = CmakeProject(
@@ -72,12 +72,15 @@ gme = CmakeProject(
         '-DENABLE_UBSAN=OFF',
         '-DZLIB_INCLUDE_DIR=OFF',
         '-DCMAKE_DISABLE_FIND_PACKAGE_SDL2=ON',
+
+        # cmake 4 complains about gme's cmake_minimum_required=2.6
+        '-DCMAKE_POLICY_VERSION_MINIMUM=3.5',
     ],
 )
 
 ffmpeg = FfmpegProject(
-    'http://ffmpeg.org/releases/ffmpeg-7.1.tar.xz',
-    '40973d44970dbc83ef302b0609f2e74982be2d85916dd2ee7472d30678a7abe6',
+    'http://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz',
+    '733984395e0dbbe5c046abda2dc49a5544e7e0e1e2366bba849222ae9e3a03b1',
     'lib/libavcodec.a',
     [
         '--disable-shared', '--enable-static',
@@ -523,8 +526,8 @@ ffmpeg = FfmpegProject(
 )
 
 libnfs = AutotoolsProject(
-    'https://github.com/sahlberg/libnfs/archive/libnfs-5.0.3.tar.gz',
-    'd945cb4f4c8f82ee1f3640893a168810f794a28e1010bb007ec5add345e9df3e',
+    'https://github.com/sahlberg/libnfs/archive/libnfs-6.0.2.tar.gz',
+    '4e5459cc3e0242447879004e9ad28286d4d27daa42cbdcde423248fad911e747',
     'lib/libnfs.a',
     [
         '--disable-shared', '--enable-static',
@@ -534,7 +537,8 @@ libnfs = AutotoolsProject(
         '--disable-werror',
 
         '--disable-utils', '--disable-examples',
+        '--without-libkrb5',
     ],
-    base='libnfs-libnfs-5.0.3',
+    base='libnfs-libnfs-6.0.2',
     autoreconf=True,
 )

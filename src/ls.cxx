@@ -8,6 +8,7 @@
 #include "decoder/DecoderList.hxx"
 #include "decoder/DecoderPlugin.hxx"
 #include "client/Response.hxx"
+#include "net/Features.hxx" // for HAVE_UN
 #include "util/UriExtract.hxx"
 
 #include <fmt/format.h>
@@ -56,7 +57,7 @@ print_supported_uri_schemes(Response &r)
 	}
 
 	for (const auto& protocol : protocols) {
-		r.Fmt(FMT_STRING("handler: {}\n"), protocol);
+		r.Fmt("handler: {}\n", protocol);
 	}
 }
 

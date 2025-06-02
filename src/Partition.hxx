@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright The Music Player Daemon Project
 
-#ifndef MPD_PARTITION_HXX
-#define MPD_PARTITION_HXX
+#pragma once
 
 #include "event/MaskMonitor.hxx"
 #include "queue/Playlist.hxx"
@@ -13,12 +12,12 @@
 #include "player/Control.hxx"
 #include "player/Listener.hxx"
 #include "protocol/RangeArg.hxx"
+#include "db/Features.hxx" // for ENABLE_DATABASE
 #include "util/IntrusiveList.hxx"
 #include "ReplayGainMode.hxx"
 #include "SingleMode.hxx"
 #include "ConsumeMode.hxx"
 #include "Chrono.hxx"
-#include "config.h"
 
 #include <string>
 #include <memory>
@@ -156,6 +155,10 @@ struct Partition final : QueueListener, PlayerListener, MixerListener {
 		playlist.Stop(pc);
 	}
 
+	void PlayAny() {
+		return playlist.PlayAny(pc);
+	}
+
 	void PlayPosition(int position) {
 		return playlist.PlayPosition(pc, position);
 	}
@@ -279,5 +282,3 @@ private:
 	/* callback for #global_events */
 	void OnGlobalEvent(unsigned mask) noexcept;
 };
-
-#endif

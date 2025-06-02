@@ -64,7 +64,7 @@ AsyncInputStream::Resume()
 void
 AsyncInputStream::Check()
 {
-	if (postponed_exception)
+	if (postponed_exception) [[unlikely]]
 		std::rethrow_exception(std::exchange(postponed_exception,
 						     std::exception_ptr()));
 }
@@ -159,6 +159,23 @@ AsyncInputStream::IsAvailable() const noexcept
 		!buffer.empty();
 }
 
+inline std::size_t
+AsyncInputStream::ReadFromBuffer(std::span<std::byte> dest) noexcept
+{
+	const size_t nbytes = buffer.MoveTo(dest);
+	if (nbytes == 0)
+		return 0;
+
+	if (buffer.empty())
+		/* when the buffer becomes empty, reset its head and
+		   tail so the next write can fill the whole buffer
+		   and not just the part after the tail */
+		buffer.Clear();
+
+	offset += (offset_type)nbytes;
+	return nbytes;
+}
+
 size_t
 AsyncInputStream::Read(std::unique_lock<Mutex> &lock,
 		       std::span<std::byte> dest)
@@ -166,27 +183,21 @@ AsyncInputStream::Read(std::unique_lock<Mutex> &lock,
 	assert(!GetEventLoop().IsInside());
 
 	/* wait for data */
-	CircularBuffer<std::byte>::Range r;
 	while (true) {
 		Check();
 
-		r = buffer.Read();
-		if (!r.empty() || IsEOF())
-			break;
+		if (std::size_t nbytes = ReadFromBuffer(dest); nbytes > 0) {
+			if (paused && buffer.GetSize() < resume_at)
+				deferred_resume.Schedule();
+
+			return nbytes;
+		}
+
+		if (IsEOF())
+			return 0;
 
 		caller_cond.wait(lock);
 	}
-
-	const size_t nbytes = std::min(dest.size(), r.size());
-	memcpy(dest.data(), r.data(), nbytes);
-	buffer.Consume(nbytes);
-
-	offset += (offset_type)nbytes;
-
-	if (paused && buffer.GetSize() < resume_at)
-		deferred_resume.Schedule();
-
-	return nbytes;
 }
 
 void
@@ -240,6 +251,14 @@ AsyncInputStream::DeferredResume() noexcept
 {
 	const std::scoped_lock protect{mutex};
 
+	if (postponed_exception) [[unlikely]] {
+		/* do not proceed, first the caller must handle the
+                   pending error */
+		caller_cond.notify_one();
+		InvokeOnAvailable();
+		return;
+	}
+
 	try {
 		Resume();
 	} catch (...) {
@@ -255,6 +274,15 @@ AsyncInputStream::DeferredSeek() noexcept
 	const std::scoped_lock protect{mutex};
 	if (seek_state != SeekState::SCHEDULED)
 		return;
+
+	if (postponed_exception) [[unlikely]] {
+		/* do not proceed, first the caller must handle the
+                   pending error */
+		seek_state = SeekState::NONE;
+		caller_cond.notify_one();
+		InvokeOnAvailable();
+		return;
+	}
 
 	try {
 		Resume();

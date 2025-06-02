@@ -7,6 +7,8 @@
 #include "fs/AllocatedPath.hxx"
 #include "lib/fmt/RuntimeError.hxx"
 
+#include <exception> // for std::throw_with_nested()
+
 #include <stdlib.h>
 
 void
@@ -44,6 +46,12 @@ bool
 BlockParam::GetBoolValue() const
 {
 	return With(ParseBool);
+}
+
+double
+BlockParam::GetDoubleValue() const
+{
+	return With(ParseDouble);
 }
 
 std::chrono::steady_clock::duration
@@ -138,6 +146,16 @@ ConfigBlock::GetBlockValue(const char *name, bool default_value) const
 		return default_value;
 
 	return bp->GetBoolValue();
+}
+
+double
+ConfigBlock::GetBlockValue(const char *name, double default_value) const
+{
+	const BlockParam *bp = GetBlockParam(name);
+	if (bp == nullptr)
+		return default_value;
+
+	return bp->GetDoubleValue();
 }
 
 std::chrono::steady_clock::duration

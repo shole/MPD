@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright The Music Player Daemon Project
 
-#include "config.h"
 #include "FingerprintCommands.hxx"
 #include "Request.hxx"
 #include "LocateUri.hxx"
@@ -12,6 +11,7 @@
 #include "client/Client.hxx"
 #include "client/Response.hxx"
 #include "client/ThreadBackgroundCommand.hxx"
+#include "db/Features.hxx" // for ENABLE_DATABASE
 #include "input/InputStream.hxx"
 #include "input/LocalOpen.hxx"
 #include "input/Handler.hxx"
@@ -46,7 +46,7 @@ protected:
 	void Run() override;
 
 	void SendResponse(Response &r) noexcept override {
-		r.Fmt(FMT_STRING("chromaprint: {}\n"),
+		r.Fmt("chromaprint: {}\n",
 		      GetFingerprint());
 	}
 
@@ -68,7 +68,7 @@ private:
 	void DecodeFile();
 
 	/* virtual methods from class DecoderClient */
-	InputStreamPtr OpenUri(const char *uri) override;
+	InputStreamPtr OpenUri(std::string_view uri) override;
 	size_t Read(InputStream &is,
 		    std::span<std::byte> dest) noexcept override;
 
@@ -234,6 +234,8 @@ GetChromaprintCommand::DecodeFile()
 
 	assert(input_stream);
 
+	input_stream->SetHandler(this);
+
 	for (const auto &plugin : GetEnabledDecoderPlugins()) {
 		if (DecodeFile(suffix, *input_stream, plugin))
 			break;
@@ -246,14 +248,14 @@ try {
 	if (!path.IsNull())
 		DecodeFile();
 	else
-		DecodeStream(*OpenUri(uri.c_str()));
+		DecodeStream(*OpenUri(uri));
 
 	ChromaprintDecoderClient::Finish();
 } catch (StopDecoder) {
 }
 
 InputStreamPtr
-GetChromaprintCommand::OpenUri(const char *uri2)
+GetChromaprintCommand::OpenUri(std::string_view uri2)
 {
 	if (cancel)
 		throw StopDecoder();
