@@ -8,12 +8,13 @@ if host_machine.system() == 'linux'
     'EventFD.cxx',
     'SignalFD.cxx',
     'EpollFD.cxx',
+    'PageAllocator.cxx',
   ]
 endif
 
 if host_machine.system() == 'windows'
   system_sources += [
-    'Clock.cxx',
+    'windows/Clock.cxx',
   ]
 endif
 

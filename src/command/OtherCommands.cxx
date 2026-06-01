@@ -85,11 +85,11 @@ handle_listfiles(Client &client, Request args, Response &r)
 	/* default is root directory */
 	const auto uri = args.GetOptional(0, "");
 
-	const auto located_uri = LocateUri(UriPluginKind::STORAGE, uri, &client
+	const auto located_uri = LocateUri(UriPluginKind::STORAGE, uri, &client,
 #ifdef ENABLE_DATABASE
-					   , nullptr
+					   nullptr,
 #endif
-					   );
+					   true);
 
 	switch (located_uri.type) {
 	case LocatedUri::Type::ABSOLUTE:
@@ -140,7 +140,7 @@ public:
 };
 
 static CommandResult
-handle_lsinfo_absolute(Response &r, const char *uri)
+handle_lsinfo_absolute(Response &r, const std::string_view uri)
 {
 	PrintTagHandler h(r);
 	if (!tag_stream_scan(uri, h)) {
@@ -152,7 +152,7 @@ handle_lsinfo_absolute(Response &r, const char *uri)
 }
 
 static CommandResult
-handle_lsinfo_relative(Client &client, Response &r, const char *uri)
+handle_lsinfo_relative(Client &client, Response &r, const std::string_view uri)
 {
 #ifdef ENABLE_DATABASE
 	if (CommandResult result = handle_lsinfo2(client, uri, r);
@@ -180,7 +180,7 @@ handle_lsinfo_relative(Client &client, Response &r, const char *uri)
 
 static CommandResult
 handle_lsinfo_path(Client &, Response &r,
-		   const char *path_utf8, Path path_fs)
+		   const std::string_view path_utf8, Path path_fs)
 {
 	DetachedSong song(path_utf8);
 	if (!song.LoadFile(path_fs)) {
@@ -205,11 +205,11 @@ handle_lsinfo(Client &client, Request args, Response &r)
 		   compatibility, work around this here */
 		uri = "";
 
-	const auto located_uri = LocateUri(UriPluginKind::INPUT, uri, &client
+	const auto located_uri = LocateUri(UriPluginKind::INPUT, uri, &client,
 #ifdef ENABLE_DATABASE
-					   , nullptr
+					   nullptr,
 #endif
-					   );
+					   true);
 
 	switch (located_uri.type) {
 	case LocatedUri::Type::ABSOLUTE:

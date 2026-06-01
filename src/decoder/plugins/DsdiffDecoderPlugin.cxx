@@ -377,12 +377,16 @@ dsdiff_decode_chunk(DecoderClient &client, InputStream &is,
 				break;
 			}
 
-			if (dsdlib_skip_to(&client, is,
-					   start_offset + offset)) {
-				client.CommandFinished();
-				remaining_bytes = total_bytes - offset;
-			} else
-				client.SeekError();
+			try {
+				if (dsdlib_skip_to(&client, is,
+						   start_offset + offset)) {
+					client.CommandFinished();
+					remaining_bytes = total_bytes - offset;
+				} else
+					client.SeekError();
+			} catch (...) {
+				client.SeekError(std::current_exception());
+			}
 		}
 
 		/* see how much aligned data from the remaining chunk
@@ -471,12 +475,12 @@ dsdiff_scan_stream(InputStream &is, TagHandler &handler)
 	return true;
 }
 
-static const char *const dsdiff_suffixes[] = {
+static constexpr const char *dsdiff_suffixes[] = {
 	"dff",
 	nullptr
 };
 
-static const char *const dsdiff_mime_types[] = {
+static constexpr const char *dsdiff_mime_types[] = {
 	"application/x-dff",
 	"audio/x-dff",
 	"audio/x-dsd",

@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: BSD-2-Clause
 // Copyright CM4all GmbH
-// author: Max Kellermann <mk@cm4all.com>
+// author: Max Kellermann <max.kellermann@ionos.com>
 
 #pragma once
 
 #include "Chrono.hxx"
-#include "event/Features.h"
 #include "util/IntrusiveTreeSet.hxx"
 
 class FineTimerEvent;
@@ -22,7 +21,7 @@ class TimerList final {
 			 IntrusiveTreeSetOperators<FineTimerEvent, GetDue>> timers;
 
 public:
-	TimerList();
+	TimerList() noexcept;
 	~TimerList() noexcept;
 
 	TimerList(const TimerList &other) = delete;

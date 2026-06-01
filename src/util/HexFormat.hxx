@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: BSD-2-Clause
 // Copyright CM4all GmbH
-// author: Max Kellermann <mk@cm4all.com>
+// author: Max Kellermann <max.kellermann@ionos.com>
 
 #pragma once
 
-#include <array>
+#include "FixedString.hxx"
+
 #include <cstdint>
 #include <span>
 
@@ -75,15 +76,17 @@ HexFormat(char *output, std::span<const std::byte> input) noexcept
  * dump of the given fixed-size input.
  */
 template<std::size_t size>
+requires(size != std::dynamic_extent)
 constexpr auto
 HexFormat(std::span<const std::byte, size> input) noexcept
 {
-	std::array<char, size * 2> output;
+	FixedString<size * 2> output;
 	HexFormat(output.data(), input);
 	return output;
 }
 
 template<std::size_t size>
+requires(size != std::dynamic_extent)
 constexpr auto
 HexFormat(std::span<std::byte, size> input) noexcept
 {

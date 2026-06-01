@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright The Music Player Daemon Project
 
-#ifndef MPD_SLICE_BUFFER_HXX
-#define MPD_SLICE_BUFFER_HXX
+#pragma once
 
-#include "HugeAllocator.hxx"
+#include "HugeArray.hxx"
 
 #include <cassert>
 #include <cstddef>
@@ -73,6 +72,10 @@ public:
 		buffer.SetName(name);
 	}
 
+	void PopulateMemory() noexcept {
+		buffer.Populate();
+	}
+
 	void DiscardMemory() noexcept {
 		assert(empty());
 
@@ -121,13 +124,5 @@ public:
 		slice->next = available;
 		available = slice;
 		--n_allocated;
-
-		/* give memory back to the kernel when the last slice
-		   was freed */
-		if (n_allocated == 0) {
-			DiscardMemory();
-		}
 	}
 };
-
-#endif

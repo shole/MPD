@@ -257,11 +257,16 @@ dsf_decode_chunk(DecoderClient &client, InputStream &is,
 
 			offset_type offset =
 				start_offset + block * block_size;
-			if (dsdlib_skip_to(&client, is, offset)) {
-				client.CommandFinished();
-				i = block;
-			} else
-				client.SeekError();
+
+			try {
+				if (dsdlib_skip_to(&client, is, offset)) {
+					client.CommandFinished();
+					i = block;
+				} else
+					client.SeekError();
+			} catch (...) {
+				client.SeekError(std::current_exception());
+			}
 		}
 
 		/* worst-case buffer size */
@@ -336,12 +341,12 @@ dsf_scan_stream(InputStream &is, TagHandler &handler)
 	return true;
 }
 
-static const char *const dsf_suffixes[] = {
+static constexpr const char *dsf_suffixes[] = {
 	"dsf",
 	nullptr
 };
 
-static const char *const dsf_mime_types[] = {
+static constexpr const char *dsf_mime_types[] = {
 	"application/x-dsf",
 	"audio/x-dsf",
 	"audio/x-dsd",

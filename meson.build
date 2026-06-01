@@ -11,6 +11,7 @@ project(
     'warning_level=3',
 
     'fmt:cpp_std=c++23',
+    'gtest:cpp_std=c++23',
 
     # If we build those libraries as Meson subproject, they shall be
     # linked statically into the MPD executable.
@@ -30,6 +31,7 @@ project(
     'ogg:default_library=static',
     'openssl:default_library=static',
     'opus:default_library=static',
+    'pcre2:default_library=static',
     'sqlite3:default_library=static',
     'vorbis:default_library=static',
 
@@ -57,6 +59,8 @@ project(
     'openssl:warning_level=0',
     'opus:werror=false',
     'opus:warning_level=0',
+    'pcre2:werror=false',
+    'pcre2:warning_level=0',
     'vorbis:warning_level=0',
 
     # Disable subprojects features we don't need
@@ -101,6 +105,8 @@ project(
     'opus:docs=disabled',
     'opus:extra-programs=disabled',
     'opus:tests=disabled',
+    'pcre2:grep=false',
+    'pcre2:test=false',
   ],
   license: 'GPLv2+',
 )
@@ -110,10 +116,10 @@ version_cxx = vcs_tag(input: 'src/GitVersion.cxx', output: 'GitVersion.cxx')
 compiler = meson.get_compiler('cpp')
 c_compiler = meson.get_compiler('c')
 
-if compiler.get_id() == 'gcc' and compiler.version().version_compare('<12')
-  warning('Your GCC version is too old.  You need at least version 12.')
-elif compiler.get_id() == 'clang' and compiler.version().version_compare('<14')
-  warning('Your clang version is too old.  You need at least version 14.')
+if compiler.get_id() == 'gcc' and compiler.version().version_compare('<14')
+  warning('Your GCC version is too old.  You need at least version 14.')
+elif compiler.get_id() == 'clang' and compiler.version().version_compare('<19')
+  warning('Your clang version is too old.  You need at least version 19.')
 endif
 
 version_conf = configuration_data()
@@ -380,6 +386,7 @@ sources = [
   'src/client/Response.cxx',
   'src/client/ThreadBackgroundCommand.cxx',
   'src/client/ProtocolFeature.cxx',
+  'src/client/StringNormalization.cxx',
   'src/Listen.cxx',
   'src/LogInit.cxx',
   'src/ls.cxx',
@@ -466,16 +473,20 @@ if enable_database
 endif
 
 subdir('src/util')
+subdir('src/protocol')
 subdir('src/cmdline')
 subdir('src/time')
 subdir('src/lib/icu')
-subdir('src/fs')
 subdir('src/io')
+subdir('src/io/linux')
+subdir('src/fs')
+subdir('src/io/fs')
 subdir('src/io/uring')
 subdir('src/system')
 subdir('src/system/linux')
 subdir('src/thread')
 subdir('src/net')
+subdir('src/memory')
 subdir('src/event')
 subdir('src/win32')
 
@@ -621,6 +632,7 @@ mpd = build_target(
     fs_dep,
     net_dep,
     util_dep,
+    io_linux_dep,
     event_dep,
     thread_dep,
     neighbor_glue_dep,
@@ -639,7 +651,9 @@ mpd = build_target(
     zeroconf_dep,
     more_deps,
     chromaprint_dep,
+    memory_dep,
     fmt_dep,
+    protocol_dep,
   ],
   link_args: link_args,
   build_by_default: not get_option('fuzzer'),

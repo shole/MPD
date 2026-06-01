@@ -32,12 +32,23 @@
 
 #include <stdio.h>
 
+using std::string_view_literals::operator""sv;
+
 static constexpr Domain mpg123_domain("mpg123");
 
+/**
+ * Use mpg123_scan() on database update?  This is expensive because it
+ * reads and parses the whole file (therefore disabled by default),
+ * but is the only way to get a reliable song duration.
+ */
+static bool full_scan;
+
 static bool
-mpd_mpg123_init([[maybe_unused]] const ConfigBlock &block)
+mpd_mpg123_init(const ConfigBlock &block)
 {
 	mpg123_init();
+
+	full_scan = block.GetBlockValue("full_scan", false);
 
 	return true;
 }
@@ -325,6 +336,7 @@ Decode(DecoderClient &client, InputStream *is,
 #ifdef ENABLE_ID3TAG
 	/* prepare for using mpg123_id3_raw() later */
 	mpg123_param(&handle, MPG123_ADD_FLAGS, MPG123_STORE_RAW_ID3, 0);
+	mpg123_param(&handle, MPG123_ADD_FLAGS, MPG123_SKIP_ID3V2, 0);
 #endif
 
 	AudioFormat audio_format;
@@ -389,7 +401,8 @@ Decode(DecoderClient &client, InputStream *is,
 			off_t c = client.GetSeekFrame();
 			c = mpg123_seek(&handle, c, SEEK_SET);
 			if (c < 0)
-				client.SeekError();
+				client.SeekError(std::make_exception_ptr(FmtRuntimeError("mpg123_seek() failed: {}"sv,
+											 mpg123_strerror(&handle))));
 			else {
 				client.CommandFinished();
 				client.SubmitTimestamp(audio_format.FramesToTime<FloatDuration>(c));
@@ -415,6 +428,13 @@ mpd_mpg123_stream_decode(DecoderClient &client, InputStream &is)
 	}
 
 	AtScopeExit(handle) { mpg123_delete(handle); };
+
+	if (is.IsSeekable())
+		/* in "stream" mode, libmpg123 assumes that the song
+		   is not seekable (even if the "lseek" method is
+		   implemented), unless we force it to with
+		   MPG123_FORCE_SEEKABLE */
+		mpg123_param(handle, MPG123_ADD_FLAGS, MPG123_FORCE_SEEKABLE, 0);
 
 	struct mpd_mpg123_iohandle iohandle{
 		.client = &client,
@@ -457,7 +477,11 @@ Scan(mpg123_handle &handle, TagHandler &handler) noexcept
 #ifdef ENABLE_ID3TAG
 	/* prepare for using mpg123_id3_raw() later */
 	mpg123_param(&handle, MPG123_ADD_FLAGS, MPG123_STORE_RAW_ID3, 0);
+	mpg123_param(&handle, MPG123_ADD_FLAGS, MPG123_SKIP_ID3V2, 0);
 #endif
+
+	if (full_scan)
+		mpg123_scan(&handle);
 
 	AudioFormat audio_format;
 
@@ -532,7 +556,7 @@ mpd_mpg123_scan_file(Path path_fs, TagHandler &handler) noexcept
 	return Scan(*handle, handler);
 }
 
-static const char *const mpg123_suffixes[] = {
+static constexpr const char *mpg123_suffixes[] = {
 	"mp3",
 	nullptr
 };

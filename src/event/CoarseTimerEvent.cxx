@@ -1,31 +1,52 @@
 // SPDX-License-Identifier: BSD-2-Clause
 // Copyright CM4all GmbH
-// author: Max Kellermann <mk@cm4all.com>
+// author: Max Kellermann <max.kellermann@ionos.com>
 
 #include "CoarseTimerEvent.hxx"
 #include "Loop.hxx"
+
+void
+CoarseTimerEvent::SetDue(Event::Duration d) noexcept
+{
+	assert(!IsPending());
+
+	SetDue(loop.SteadyNow() + d);
+}
+
+void
+CoarseTimerEvent::ScheduleCurrent() noexcept
+{
+	assert(!IsPending());
+
+	loop.Insert(*this);
+}
 
 void
 CoarseTimerEvent::Schedule(Event::Duration d) noexcept
 {
 	Cancel();
 
-	due = loop.SteadyNow() + d;
-	loop.Insert(*this);
+	SetDue(d);
+	ScheduleCurrent();
 }
 
 void
-CoarseTimerEvent::ScheduleEarlier(Event::Duration d) noexcept
+CoarseTimerEvent::ScheduleEarlier(Event::TimePoint t) noexcept
 {
-	const auto new_due = loop.SteadyNow() + d;
-
 	if (IsPending()) {
-		if (new_due >= due)
+		if (t >= due)
 			return;
 
 		Cancel();
 	}
 
-	due = new_due;
-	loop.Insert(*this);
+	SetDue(t);
+	ScheduleCurrent();
+
+}
+
+void
+CoarseTimerEvent::ScheduleEarlier(Event::Duration d) noexcept
+{
+	ScheduleEarlier(loop.SteadyNow() + d);
 }

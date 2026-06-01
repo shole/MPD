@@ -8,7 +8,7 @@
 #include "thread/Thread.hxx"
 #include "thread/Mutex.hxx"
 #include "thread/Cond.hxx"
-#include "util/SparseBuffer.hxx"
+#include "memory/SparseBuffer.hxx"
 
 #include <cstddef>
 #include <exception>
@@ -104,7 +104,7 @@ protected:
 	 * added to the buffer.  During this method call, the mutex is
 	 * locked.
 	 */
-	virtual void OnBufferAvailable() noexcept {}
+	virtual void OnBufferAvailable([[maybe_unused]] std::unique_lock<Mutex> &lock) noexcept {}
 
 private:
 	size_t FindFirstHole() const noexcept;

@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: BSD-2-Clause
 // Copyright CM4all GmbH
-// author: Max Kellermann <mk@cm4all.com>
+// author: Max Kellermann <max.kellermann@ionos.com>
 
 #pragma once
 
 #include "Chrono.hxx"
-#include "event/Features.h"
 #include "util/BindMethod.hxx"
 #include "util/IntrusiveTreeSet.hxx"
 
@@ -90,6 +89,7 @@ public:
 	 * Like Schedule(), but is a no-op if there is a due time
 	 * earlier than the given one.
 	 */
+	void ScheduleEarlier(Event::TimePoint t) noexcept;
 	void ScheduleEarlier(Event::Duration d) noexcept;
 
 	void Cancel() noexcept {

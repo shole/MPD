@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-2-Clause
 // Copyright CM4all GmbH
-// author: Max Kellermann <mk@cm4all.com>
+// author: Max Kellermann <max.kellermann@ionos.com>
 
 #pragma once
 
@@ -38,6 +38,11 @@ public:
 		ring.SetMaxWorkers(bounded, unbounded);
 	}
 
+	[[gnu::pure]]
+	bool HasOverflow() const noexcept {
+		return ring.HasOverflow();
+	}
+
 	struct io_uring_sqe *GetSubmitEntry() noexcept {
 		return ring.GetSubmitEntry();
 	}
@@ -52,6 +57,22 @@ public:
 
 	bool HasPending() const noexcept {
 		return !operations.empty();
+	}
+
+	/**
+	 * Are there more than this number of pending operations?
+	 * This is a special method for integration into #EventLoop so
+	 * #EventLoop can determine whether there are pending
+	 * operations other than its own ones.
+	 */
+	[[gnu::pure]]
+	bool HasPendingMoreThan(std::size_t n) const noexcept {
+		for (auto i = operations.begin(), end = operations.end(); i != end; ++i) {
+			if (n-- == 0)
+				return true;
+		}
+
+		return false;
 	}
 
 protected:

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-2-Clause
 // Copyright CM4all GmbH
-// author: Max Kellermann <mk@cm4all.com>
+// author: Max Kellermann <max.kellermann@ionos.com>
 
 #pragma once
 
@@ -14,6 +14,7 @@
    in the move operator/constructor, and that's okay, we're not going
    to use it in that case anyway */
 #pragma GCC diagnostic ignored "-Wuninitialized"
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #endif
 
 /**

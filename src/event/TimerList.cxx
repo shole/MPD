@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-2-Clause
 // Copyright CM4all GmbH
-// author: Max Kellermann <mk@cm4all.com>
+// author: Max Kellermann <max.kellermann@ionos.com>
 
 #include "TimerList.hxx"
 #include "FineTimerEvent.hxx"
@@ -11,7 +11,7 @@ TimerList::GetDue::operator()(const FineTimerEvent &timer) const noexcept
 	return timer.GetDue();
 }
 
-TimerList::TimerList() = default;
+TimerList::TimerList() noexcept = default;
 
 TimerList::~TimerList() noexcept
 {

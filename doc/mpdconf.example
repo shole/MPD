@@ -1,5 +1,5 @@
 # An example configuration file for MPD.
-# Read the user manual for documentation: http://www.musicpd.org/doc/user/
+# Read the user manual for documentation: https://mpd.readthedocs.io/en/stable/user.html#configuration
 
 
 # Files and directories #######################################################
@@ -55,7 +55,7 @@
 # it was brought down. This setting is disabled by default and the server
 # state will be reset on server start up.
 #
-#state_file			"$XDG_RUNTIME_DIR/mpd/state"
+#state_file			"$XDG_STATE_HOME/mpd/state"
 #state_file			"~/.mpd/state"
 #
 # The location of the sticker database.  This is a database which
@@ -75,13 +75,6 @@
 # current user.
 #
 #user				"nobody"
-#
-# This setting specifies the group that MPD will run as. If not specified
-# primary group of user specified with "user" setting will be used (if set).
-# This is useful if MPD needs to be a member of group such as "audio" to
-# have permission to use sound card.
-#
-#group				"nogroup"
 #
 # This setting sets the address for the daemon to listen on. Careful attention
 # should be paid if this is assigned to anything other than the default, any.
@@ -126,7 +119,7 @@
 #metadata_to_use "+comment"
 #
 # This setting enables automatic update of MPD's database when files in
-# music_directory are changed.
+# music_directory are changed.  (Linux only)
 #
 #auto_update	"yes"
 #
@@ -172,6 +165,15 @@
 #
 # If this setting is set, MPD will require password authorization. The password
 # setting can be specified multiple times for different password profiles.
+#
+# Possible permisisons:
+#
+# NAME    DESCRIPTION
+# read    Allows reading of the database, displaying the current playlist, and current status of MPD.
+# add     Allows adding songs and loading playlists.
+# player  Allows any player and queue manipulation (start/pause/stop playback etc.).
+# control Allows all other player and playlist manipulations.
+# admin   Allows manipulating outputs, stickers and partitions, mounting/unmounting storage and shutting down MPD.
 #
 #password                        "password@read,add,control,admin"
 #

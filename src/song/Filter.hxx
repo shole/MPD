@@ -35,7 +35,7 @@ class SongFilter {
 public:
 	SongFilter() = default;
 
-	SongFilter(TagType tag, const char *value, bool fold_case=false);
+	SongFilter(TagType tag, const char *value, bool fold_case=false, bool strip_diacritics=false);
 
 	~SongFilter();
 
@@ -49,15 +49,15 @@ public:
 	std::string ToExpression() const noexcept;
 
 private:
-	static ISongFilterPtr ParseExpression(const char *&s, bool fold_case=false);
+	static ISongFilterPtr ParseExpression(const char *&s, bool fold_case=false, bool strip_diacritics=false);
 
-	void Parse(const char *tag, const char *value, bool fold_case=false);
+	void Parse(const char *tag, const char *value, bool fold_case=false, bool strip_diacritics=false);
 
 public:
 	/**
 	 * Throws on error.
 	 */
-	void Parse(std::span<const char *const> args, bool fold_case=false);
+	void Parse(std::span<const char *const> args, bool fold_case=false, bool strip_diacritics=false);
 
 	void Optimize() noexcept;
 
@@ -78,12 +78,6 @@ public:
 	 */
 	[[gnu::pure]]
 	bool HasFoldCase() const noexcept;
-
-	/**
-	 * Does this filter contain constraints other than "base"?
-	 */
-	[[gnu::pure]]
-	bool HasOtherThanBase() const noexcept;
 
 	/**
 	 * Returns the "base" specification (if there is one) or

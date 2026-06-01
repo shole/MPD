@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-2-Clause
 // Copyright CM4all GmbH
-// author: Max Kellermann <mk@cm4all.com>
+// author: Max Kellermann <max.kellermann@ionos.com>
 
 #pragma once
 
@@ -59,6 +59,10 @@ public:
 		event.SetReadyFlags(flags);
 	}
 
+	void ClearReadyFlags(unsigned flags) noexcept {
+		event.ClearReadyFlags(flags);
+	}
+
 	bool Schedule(unsigned flags) noexcept {
 		return event.Schedule(flags);
 	}
@@ -93,5 +97,17 @@ public:
 
 	void ScheduleImplicit() noexcept {
 		event.ScheduleImplicit();
+	}
+
+	void ScheduleAnyHangup() noexcept {
+		event.ScheduleAnyHangup();
+	}
+
+	bool IsReadPending() const noexcept {
+		return event.IsReadPending();
+	}
+
+	bool IsWritePending() const noexcept {
+		return event.IsWritePending();
 	}
 };

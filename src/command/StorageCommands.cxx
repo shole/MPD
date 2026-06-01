@@ -17,24 +17,20 @@
 #include "db/update/Service.hxx"
 #include "TimePrint.hxx"
 #include "protocol/IdleFlags.hxx"
+#include "protocol/Verify.hxx"
 
 #include <fmt/format.h>
 
 #include <memory>
 
-[[gnu::pure]]
-static bool
-skip_path(const char *name_utf8) noexcept
-{
-	return std::strchr(name_utf8, '\n') != nullptr;
-}
+using std::string_view_literals::operator""sv;
 
 static void
 handle_listfiles_storage(Response &r, StorageDirectoryReader &reader)
 {
 	const char *name_utf8;
 	while ((name_utf8 = reader.Read()) != nullptr) {
-		if (skip_path(name_utf8))
+		if (!VerifySeenFilenameUTF8(name_utf8))
 			continue;
 
 		StorageFileInfo info;
@@ -67,7 +63,7 @@ handle_listfiles_storage(Response &r, StorageDirectoryReader &reader)
 }
 
 CommandResult
-handle_listfiles_storage(Response &r, Storage &storage, const char *uri)
+handle_listfiles_storage(Response &r, Storage &storage, std::string_view uri)
 {
 	std::unique_ptr<StorageDirectoryReader> reader(storage.OpenDirectory(uri));
 	handle_listfiles_storage(r, *reader);
@@ -75,7 +71,7 @@ handle_listfiles_storage(Response &r, Storage &storage, const char *uri)
 }
 
 CommandResult
-handle_listfiles_storage(Client &client, Response &r, const char *uri)
+handle_listfiles_storage(Client &client, Response &r, std::string_view uri)
 {
 	auto &event_loop = client.GetInstance().io_thread.GetEventLoop();
 	std::unique_ptr<Storage> storage(CreateStorageURI(event_loop, uri));
@@ -84,7 +80,7 @@ handle_listfiles_storage(Client &client, Response &r, const char *uri)
 		return CommandResult::ERROR;
 	}
 
-	return handle_listfiles_storage(r, *storage, "");
+	return handle_listfiles_storage(r, *storage, ""sv);
 }
 
 static void
@@ -105,7 +101,7 @@ print_storage_uri(Client &client, Response &r, const Storage &storage)
 	} else {
 		/* hide username/passwords from client */
 
-		std::string allocated = uri_remove_auth(uri.c_str());
+		std::string allocated = uri_remove_auth(uri);
 		if (!allocated.empty())
 			uri = std::move(allocated);
 	}

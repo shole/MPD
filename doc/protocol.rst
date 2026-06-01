@@ -354,6 +354,7 @@ The following tags are supported by :program:`MPD`:
   <http://id3.org/id3v2.4.0-frames>`_).
 * **comment**: a human-readable comment about this song. The exact meaning of this tag is not well-defined.
 * **disc**: the decimal disc number in a multi-disc album.
+* **discsubtitle**: the disc subtitle in a multi-disc album.
 * **label**: the name of the label or publisher.
 * **musicbrainz_artistid**: the artist id in the `MusicBrainz <https://picard.musicbrainz.org/docs/mappings/>`_ database.
 * **musicbrainz_albumid**: the album id in the `MusicBrainz <https://picard.musicbrainz.org/docs/mappings/>`_ database.
@@ -1113,7 +1114,7 @@ The music database
 
     This is currently implemented by searching the directory the file
     resides in for a file called :file:`cover.png`, :file:`cover.jpg`,
-    or :file:`cover.webp`.
+    :file:`cover.jxl`, or :file:`cover.webp`.
 
     Returns the file size and actual number
     of bytes read at the requested offset, followed
@@ -1750,6 +1751,44 @@ Connection settings
 
 :command:`protocol available`
     Lists all available protocol features.
+
+.. _command_stringnormalization:
+
+:command:`stringnormalization`
+    Shows a list of enabled string normalization options when searching
+    using :ref:`search <command_search>`.
+
+    Available options:
+
+    - ``strip_diacritics``: strip diacritics from searched strings
+
+    The following ``stringnormalization`` sub commands configure the
+    options.
+
+.. _command_stringnormalization_disable:
+
+:command:`stringnormalization disable {FEATURE...}`
+    Disables one or more string normalization options.
+
+.. _command_stringnormalization_enable:
+
+:command:`stringnormalization enable {FEATURE...}`
+    Enables one or more string normalization options.
+
+.. _command_stringnormalization_clear:
+
+:command:`stringnormalization clear`
+    Disables all string normalization options.
+
+.. _command_stringnormalization_all:
+
+:command:`stringnormalization all`
+    Enables all string normalization options.
+
+.. _command_stringnormalization_available:
+
+:command:`stringnormalization available`
+    Lists all available string normalization options.
 
 .. _partition_commands:
 

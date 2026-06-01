@@ -11,6 +11,7 @@
 #include "util/ByteOrder.hxx"
 #include "util/Domain.hxx"
 #include "util/ByteReverse.hxx"
+#include "util/DivideRoundUp.hxx"
 #include "util/StaticFifoBuffer.hxx"
 #include "util/CNumberParser.hxx"
 #include "util/MimeType.hxx"
@@ -161,7 +162,7 @@ pcm_stream_decode(DecoderClient &client, InputStream &is)
 
 	/* a buffer for pcm_unpack_24be() large enough to hold the
 	   results for a full source buffer */
-	int32_t unpack_buffer[buffer.GetCapacity() / 3];
+	int32_t unpack_buffer[DivideRoundUp(buffer.GetCapacity(), std::size_t{3})];
 
 	DecoderCommand cmd;
 	do {
@@ -205,8 +206,7 @@ pcm_stream_decode(DecoderClient &client, InputStream &is)
 				buffer.Clear();
 				client.CommandFinished();
 			} catch (...) {
-				LogError(std::current_exception());
-				client.SeekError();
+				client.SeekError(std::current_exception());
 			}
 
 			cmd = DecoderCommand::NONE;
@@ -214,7 +214,7 @@ pcm_stream_decode(DecoderClient &client, InputStream &is)
 	} while (cmd == DecoderCommand::NONE);
 }
 
-static const char *const pcm_mime_types[] = {
+static constexpr const char *pcm_mime_types[] = {
 	/* RFC 2586 */
 	"audio/L16",
 

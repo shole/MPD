@@ -11,10 +11,11 @@
 #include "../ArchiveVisitor.hxx"
 #include "input/InputStream.hxx"
 #include "fs/Path.hxx"
+#include "protocol/Verify.hxx"
 #include "lib/fmt/PathFormatter.hxx"
 #include "lib/fmt/RuntimeError.hxx"
+#include "thread/ScopeUnlock.hxx"
 #include "util/StringCompare.hxx"
-#include "util/UTF8.hxx"
 
 #include <cdio/iso9660.h>
 
@@ -82,14 +83,12 @@ Iso9660ArchiveFile::Visit(char *path, size_t length, size_t capacity,
 		auto *statbuf = (iso9660_stat_t *)
 			_cdio_list_node_data(entnode);
 		const char *filename = statbuf->filename;
-		if (StringIsEmpty(filename) ||
-		    PathTraitsUTF8::IsSpecialFilename(filename))
+		if (PathTraitsUTF8::IsSpecialFilename(filename))
 			/* skip empty names (libcdio bug?) */
 			/* skip special names like "." and ".." */
 			continue;
 
-		if (!ValidateUTF8(filename))
-			/* ignore file names which are not valid UTF-8 */
+		if (!VerifyRelativePathUTF8(filename))
 			continue;
 
 		size_t filename_length = strlen(filename);
@@ -235,9 +234,11 @@ Iso9660ArchiveFile::OpenStream(const char *pathname,
 }
 
 size_t
-Iso9660InputStream::Read(std::unique_lock<Mutex> &,
+Iso9660InputStream::Read(std::unique_lock<Mutex> &lock,
 			 std::span<std::byte> dest)
 {
+	assert(lock.mutex() == &mutex);
+
 	const offset_type remaining = size - offset;
 	if (remaining == 0)
 		return 0;
@@ -252,7 +253,7 @@ Iso9660InputStream::Read(std::unique_lock<Mutex> &,
 
 		assert((offset - skip) % ISO_BLOCKSIZE == 0);
 
-		const ScopeUnlock unlock(mutex);
+		const ScopeUnlock unlock{lock};
 
 		const lsn_t read_lsn = lsn + offset / ISO_BLOCKSIZE;
 

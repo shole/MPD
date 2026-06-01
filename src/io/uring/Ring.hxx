@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-2-Clause
 // Copyright CM4all GmbH
-// author: Max Kellermann <mk@cm4all.com>
+// author: Max Kellermann <max.kellermann@ionos.com>
 
 #pragma once
 
@@ -65,6 +65,15 @@ public:
 	void SetMaxWorkers(unsigned bounded, unsigned unbounded) {
 		unsigned values[2] = {bounded, unbounded};
 		SetMaxWorkers(values);
+	}
+
+	/**
+	 * @return true if there are overflow entries waiting to be
+	 * flushed onto the CQ ring
+	 */
+	[[gnu::pure]]
+	bool HasOverflow() const noexcept {
+		return io_uring_cq_has_overflow(&ring);
 	}
 
 	/**

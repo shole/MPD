@@ -40,7 +40,7 @@ AddUri(Client &client, const LocatedUri &uri)
 #ifdef ENABLE_DATABASE
 
 static void
-AddDatabaseSelection(Partition &partition, const char *uri)
+AddDatabaseSelection(Partition &partition, const std::string_view uri)
 {
 	const ScopeBulkEdit bulk_edit(partition);
 
@@ -70,11 +70,11 @@ handle_add(Client &client, Request args, [[maybe_unused]] Response &r)
 		: old_size;
 
 	const auto located_uri = LocateUri(UriPluginKind::INPUT, uri,
-					   &client
+					   &client,
 #ifdef ENABLE_DATABASE
-					   , nullptr
+					   nullptr,
 #endif
-					   );
+					   true);
 	switch (located_uri.type) {
 	case LocatedUri::Type::ABSOLUTE:
 		AddUri(client, located_uri);
@@ -291,7 +291,7 @@ ParseSortTag(const char *s)
 
 static CommandResult
 handle_playlist_match(Client &client, Request args, Response &r,
-		      bool fold_case)
+		      bool fold_case, bool strip_diacritics)
 {
 	RangeArg window = RangeArg::All();
 	if (args.size() >= 2 && StringIsEqual(args[args.size() - 2], "window")) {
@@ -318,7 +318,7 @@ handle_playlist_match(Client &client, Request args, Response &r,
 
 	SongFilter filter;
 	try {
-		filter.Parse(args, fold_case);
+		filter.Parse(args, fold_case, strip_diacritics);
 	} catch (...) {
 		r.Error(ACK_ERROR_ARG,
 			GetFullMessage(std::current_exception()).c_str());
@@ -339,13 +339,14 @@ handle_playlist_match(Client &client, Request args, Response &r,
 CommandResult
 handle_playlistfind(Client &client, Request args, Response &r)
 {
-	return handle_playlist_match(client, args, r, false);
+	return handle_playlist_match(client, args, r, false, false);
 }
 
 CommandResult
 handle_playlistsearch(Client &client, Request args, Response &r)
 {
-	return handle_playlist_match(client, args, r, true);
+	auto strip_diacritics = client.StringNormalizationEnabled(SN_STRIP_DIACRITICS);
+	return handle_playlist_match(client, args, r, true, strip_diacritics);
 }
 
 CommandResult

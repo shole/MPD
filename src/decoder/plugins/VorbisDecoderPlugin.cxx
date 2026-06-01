@@ -67,7 +67,10 @@ public:
 	VorbisDecoder(const VorbisDecoder &) = delete;
 	VorbisDecoder &operator=(const VorbisDecoder &) = delete;
 
-	bool Seek(uint64_t where_frame);
+	/**
+	 * Throws on error.
+	 */
+	void Seek(uint64_t where_frame);
 
 	static AudioFormat CheckAudioFormat(const vorbis_info &vi) {
 		return ::CheckAudioFormat(vi.rate, sample_format, vi.channels);
@@ -111,7 +114,7 @@ protected:
 	void OnOggEnd() override;
 };
 
-bool
+void
 VorbisDecoder::Seek(uint64_t where_frame)
 {
 	assert(IsSeekable());
@@ -120,13 +123,8 @@ VorbisDecoder::Seek(uint64_t where_frame)
 
 	const ogg_int64_t where_granulepos(where_frame);
 
-	try {
-		SeekGranulePos(where_granulepos);
-		vorbis_synthesis_restart(&dsp);
-		return true;
-	} catch (...) {
-		return false;
-	}
+	SeekGranulePos(where_granulepos);
+	vorbis_synthesis_restart(&dsp);
 }
 
 void
@@ -268,6 +266,8 @@ VorbisDecoder::OnOggPacket(const ogg_packet &_packet)
 			vorbis_block_init(&dsp, &block);
 		}
 
+		AutoSetFirstOffset();
+
 		if (vorbis_synthesis(&block, &packet) != 0) {
 			/* ignore bad packets, but give the MPD core a
 			   chance to stop us */
@@ -328,10 +328,12 @@ vorbis_stream_decode(DecoderClient &client,
 			break;
 		} catch (DecoderCommand cmd) {
 			if (cmd == DecoderCommand::SEEK) {
-				if (d.Seek(client.GetSeekFrame()))
+				try {
+					d.Seek(client.GetSeekFrame());
 					client.CommandFinished();
-				else
-					client.SeekError();
+				} catch (...) {
+					client.SeekError(std::current_exception());
+				}
 			} else if (cmd != DecoderCommand::NONE)
 				break;
 		}
@@ -404,11 +406,11 @@ vorbis_scan_stream(InputStream &is, TagHandler &handler)
 	return true;
 }
 
-static const char *const vorbis_suffixes[] = {
+static constexpr const char *vorbis_suffixes[] = {
 	"ogg", "oga", nullptr
 };
 
-static const char *const vorbis_mime_types[] = {
+static constexpr const char *vorbis_mime_types[] = {
 	"application/ogg",
 	"application/x-ogg",
 	"audio/ogg",

@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: BSD-2-Clause
 // Copyright CM4all GmbH
-// author: Max Kellermann <mk@cm4all.com>
+// author: Max Kellermann <max.kellermann@ionos.com>
 
 #pragma once
 
 #include "Chrono.hxx"
 #include "TimerWheel.hxx"
 #include "Backend.hxx"
-#include "event/Features.h"
 #include "time/ClockCache.hxx"
 #include "util/IntrusiveList.hxx"
+#include "event/config.h"
 
 #ifndef NO_FINE_TIMER_EVENT
 #include "TimerList.hxx"
@@ -244,7 +244,7 @@ public:
 	 */
 	void InjectBreak() noexcept {
 		{
-			const std::scoped_lock lock{mutex};
+			const std::lock_guard lock{mutex};
 			quit_injected = true;
 		}
 

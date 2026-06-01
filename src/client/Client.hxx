@@ -6,6 +6,7 @@
 #include "IClient.hxx"
 #include "Message.hxx"
 #include "ProtocolFeature.hxx"
+#include "client/StringNormalization.hxx"
 #include "command/CommandResult.hxx"
 #include "command/CommandListBuilder.hxx"
 #include "db/Features.hxx" // for ENABLE_DATABASE
@@ -119,6 +120,11 @@ private:
 	 */
 	ProtocolFeature protocol_feature = ProtocolFeature::None();
 
+	/**
+	 * Bitmask of string normalizations
+	 */
+	StringNormalization string_normalization = StringNormalization::None();
+
 public:
 	Client(EventLoop &loop, Partition &partition,
 	       UniqueSocketDescriptor fd, int uid,
@@ -149,14 +155,6 @@ public:
 
 	bool WriteOK() noexcept {
 		return Write("OK\n");
-	}
-
-	/**
-	 * returns the uid of the client process, or a negative value
-	 * if the uid is unknown
-	 */
-	int GetUID() const noexcept {
-		return uid;
 	}
 
 	/**
@@ -196,6 +194,29 @@ public:
 
 	bool ProtocolFeatureEnabled(enum ProtocolFeatureType value) noexcept {
 		return protocol_feature.Test(value);
+	}
+
+	StringNormalization GetStringNormalizations() const noexcept {
+		return string_normalization;
+	}
+
+	void SetStringNormalizations(StringNormalization features, bool enable) noexcept {
+		if (enable)
+			string_normalization.Set(features);
+		else
+			string_normalization.Unset(features);
+	}
+
+	void AllStringNormalizations() noexcept {
+		string_normalization.SetAll();
+	}
+
+	void ClearStringNormalizations() noexcept {
+		string_normalization.Clear();
+	}
+
+	bool StringNormalizationEnabled(enum StringNormalizationType value) noexcept {
+		return string_normalization.Test(value);
 	}
 
 	/**

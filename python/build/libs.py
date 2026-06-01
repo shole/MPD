@@ -2,7 +2,6 @@ import re
 from os.path import abspath
 
 from build.project import Project
-from build.zlib import ZlibProject
 from build.cmake import CmakeProject
 from build.autotools import AutotoolsProject
 from build.ffmpeg import FfmpegProject
@@ -18,11 +17,16 @@ libsamplerate = CmakeProject(
     ],
 )
 
-zlib = ZlibProject(
-    ('http://zlib.net/zlib-1.3.1.tar.xz',
-     'https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.xz'),
-    '38ef96b8dfe510d42707d9c781877914792541133e1870841463bfa73f883e32',
-    'lib/libz.a',
+zlib = CmakeProject(
+    ('http://zlib.net/zlib-1.3.2.tar.xz',
+     'https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.xz'),
+    'd7a0654783a4da529d1bb793b7ad9c3318020af77667bcae35f95d0e42a792f3',
+    'include/zlib.h',
+    [
+        '-DZLIB_BUILD_TESTING=OFF',
+        '-DZLIB_BUILD_SHARED=OFF',
+    ],
+    patches='src/lib/zlib/patches',
 )
 
 libmodplug = AutotoolsProject(
@@ -36,8 +40,8 @@ libmodplug = AutotoolsProject(
 )
 
 libopenmpt = AutotoolsProject(
-    'https://lib.openmpt.org/files/libopenmpt/src/libopenmpt-0.7.13+release.autotools.tar.gz',
-    'dcd7cde4f9c498eb496c4556e1c1b81353e2a74747e8270a42565117ea42e1f1',
+    'https://lib.openmpt.org/files/libopenmpt/src/libopenmpt-0.8.6+release.autotools.tar.gz',
+    'caa2fa959e389f4374d9e2df3af5c633452c12dd80442cba2e89cb7ff2b93c5b',
     'lib/libopenmpt.a',
     [
         '--disable-shared', '--enable-static',
@@ -49,7 +53,7 @@ libopenmpt = AutotoolsProject(
         '--without-portaudio', '--without-portaudiocpp', '--without-sndfile',
         '--without-flac',
     ],
-    base='libopenmpt-0.7.13+release.autotools',
+    base='libopenmpt-0.8.6+release.autotools',
 )
 
 wildmidi = CmakeProject(
@@ -64,23 +68,23 @@ wildmidi = CmakeProject(
 )
 
 gme = CmakeProject(
-    'https://bitbucket.org/mpyne/game-music-emu/downloads/game-music-emu-0.6.3.tar.xz',
-    'aba34e53ef0ec6a34b58b84e28bf8cfbccee6585cebca25333604c35db3e051d',
+    'https://github.com/libgme/game-music-emu/releases/download/0.6.5/libgme-0.6.5-src.tar.gz',
+    'a133f19278222136ba0d8c27b64a07987ba05fec9d2e6d293ccd8cabdd97ddbb',
     'lib/libgme.a',
     [
         '-DBUILD_SHARED_LIBS=OFF',
         '-DENABLE_UBSAN=OFF',
+        '-DGME_BUILD_TESTING=OFF',
+        '-DGME_BUILD_EXAMPLES=OFF',
+        '-DGME_ZLIB=OFF',
         '-DZLIB_INCLUDE_DIR=OFF',
-        '-DCMAKE_DISABLE_FIND_PACKAGE_SDL2=ON',
-
-        # cmake 4 complains about gme's cmake_minimum_required=2.6
-        '-DCMAKE_POLICY_VERSION_MINIMUM=3.5',
     ],
+    base='libgme-0.6.5',
 )
 
 ffmpeg = FfmpegProject(
-    'http://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz',
-    '733984395e0dbbe5c046abda2dc49a5544e7e0e1e2366bba849222ae9e3a03b1',
+    'https://ffmpeg.org/releases/ffmpeg-8.1.1.tar.xz',
+    'b6863adde98898f42602017462871b5f6333e65aec803fdd7a6308639c52edf3',
     'lib/libavcodec.a',
     [
         '--disable-shared', '--enable-static',
@@ -92,7 +96,6 @@ ffmpeg = FfmpegProject(
         '--disable-avdevice',
         '--disable-swresample',
         '--disable-swscale',
-        '--disable-postproc',
         '--disable-avfilter',
         '--disable-faan',
         '--disable-pixelutils',
@@ -107,8 +110,10 @@ ffmpeg = FfmpegProject(
 
         '--disable-sdl2',
         '--disable-vulkan',
+        '--disable-videotoolbox',
         '--disable-xlib',
 
+        '--disable-parser=av1',
         '--disable-parser=bmp',
         '--disable-parser=cavsvideo',
         '--disable-parser=dvbsub',
@@ -127,9 +132,8 @@ ffmpeg = FfmpegProject(
         '--disable-parser=mpeg4video',
         '--disable-parser=mpegvideo',
         '--disable-parser=opus',
+        '--disable-parser=prores',
         '--disable-parser=qoi',
-        '--disable-parser=rv30',
-        '--disable-parser=rv40',
         '--disable-parser=vc1',
         '--disable-parser=vp3',
         '--disable-parser=vp8',
@@ -139,6 +143,8 @@ ffmpeg = FfmpegProject(
         '--disable-parser=webp',
         '--disable-parser=xma',
 
+        '--disable-demuxer=av1',
+        '--disable-demuxer=avi',
         '--disable-demuxer=aqtitle',
         '--disable-demuxer=ass',
         '--disable-demuxer=bethsoftvid',
@@ -147,6 +153,7 @@ ffmpeg = FfmpegProject(
         '--disable-demuxer=cdxl',
         '--disable-demuxer=dvbsub',
         '--disable-demuxer=dvbtxt',
+        '--disable-demuxer=dvdvideo',
         '--disable-demuxer=h261',
         '--disable-demuxer=h263',
         '--disable-demuxer=h264',
@@ -210,6 +217,8 @@ ffmpeg = FfmpegProject(
         '--disable-demuxer=tedcaptions',
         '--disable-demuxer=vobsub',
         '--disable-demuxer=vplayer',
+        '--disable-demuxer=vc1t',
+        '--disable-demuxer=vpk',
         '--disable-demuxer=webm_dash_manifest',
         '--disable-demuxer=webvtt',
         '--disable-demuxer=yuv4mpegpipe',
@@ -240,6 +249,9 @@ ffmpeg = FfmpegProject(
         '--disable-decoder=qdmc',
 
         # disable lots of image and video codecs
+        '--disable-decoder=av1',
+        '--disable-decoder=av1_amf',
+        '--disable-decoder=av1_cuvid',
         '--disable-decoder=acelp_kelvin',
         '--disable-decoder=agm',
         '--disable-decoder=aic',
@@ -256,7 +268,6 @@ ffmpeg = FfmpegProject(
         '--disable-decoder=avrn',
         '--disable-decoder=avrp',
         '--disable-decoder=avui',
-        '--disable-decoder=ayuv',
         '--disable-decoder=bethsoftvid',
         '--disable-decoder=bfi',
         '--disable-decoder=bink',
@@ -320,9 +331,12 @@ ffmpeg = FfmpegProject(
         '--disable-decoder=h263',
         '--disable-decoder=h263i',
         '--disable-decoder=h263p',
+        '--disable-decoder=h263_v4l2m2m',
         '--disable-decoder=h264',
+        '--disable-decoder=h264_v4l2m2m',
         '--disable-decoder=hap',
         '--disable-decoder=hevc',
+        '--disable-decoder=hevc_v4l2m2m',
         '--disable-decoder=hnm4_video',
         '--disable-decoder=hq_hqa',
         '--disable-decoder=hqx',
@@ -360,12 +374,14 @@ ffmpeg = FfmpegProject(
         '--disable-decoder=motionpixels',
         '--disable-decoder=movtext',
         '--disable-decoder=mpeg1video',
+        '--disable-decoder=mpeg1_v4l2m2m',
         '--disable-decoder=mpeg2video',
+        '--disable-decoder=mpeg2_v4l2m2m',
         '--disable-decoder=mpeg4',
+        '--disable-decoder=mpeg4_v4l2m2m',
         '--disable-decoder=mpegvideo',
         '--disable-decoder=msa1',
         '--disable-decoder=mscc',
-        '--disable-decoder=msmpeg4_crystalhd',
         '--disable-decoder=msmpeg4v1',
         '--disable-decoder=msmpeg4v2',
         '--disable-decoder=msmpeg4v3',
@@ -402,6 +418,7 @@ ffmpeg = FfmpegProject(
         '--disable-decoder=pjs',
         '--disable-decoder=ppm',
         '--disable-decoder=prores',
+        '--disable-decoder=prores_raw',
         '--disable-decoder=prosumer',
         '--disable-decoder=psd',
         '--disable-decoder=ptx',
@@ -448,6 +465,7 @@ ffmpeg = FfmpegProject(
         '--disable-decoder=targa',
         '--disable-decoder=targa_y216',
         '--disable-decoder=text',
+        '--disable-decoder=theora',
         '--disable-decoder=tiff',
         '--disable-decoder=tiertexseqvideo',
         '--disable-decoder=tmv',
@@ -469,15 +487,34 @@ ffmpeg = FfmpegProject(
         '--disable-decoder=vble',
         '--disable-decoder=vbn',
         '--disable-decoder=vc1',
+        '--disable-decoder=vc1image',
+        '--disable-decoder=vc1_cuvid',
+        '--disable-decoder=vc1_mmal',
+        '--disable-decoder=vc1_qsv',
+        '--disable-decoder=vc1_v4l2m2m',
         '--disable-decoder=vcr1',
         '--disable-decoder=vmdvideo',
         '--disable-decoder=vmnc',
         '--disable-decoder=vp3',
+        '--disable-decoder=vp4',
         '--disable-decoder=vp5',
         '--disable-decoder=vp6',
+        '--disable-decoder=vp6a',
+        '--disable-decoder=vp6f',
         '--disable-decoder=vp7',
         '--disable-decoder=vp8',
+        '--disable-decoder=vp8_cuvid',
+        '--disable-decoder=vp8_mediacodec',
+        '--disable-decoder=vp8_qsv',
+        '--disable-decoder=vp8_rkmpp',
+        '--disable-decoder=vp8_v4l2m2m',
         '--disable-decoder=vp9',
+        '--disable-decoder=vp9_amf',
+        '--disable-decoder=vp9_cuvid',
+        '--disable-decoder=vp9_mediacodec',
+        '--disable-decoder=vp9_qsv',
+        '--disable-decoder=vp9_rkmpp',
+        '--disable-decoder=vp9_v4l2m2m',
         '--disable-decoder=vplayer',
         '--disable-decoder=vqa',
         '--disable-decoder=webvtt',

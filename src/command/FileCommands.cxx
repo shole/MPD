@@ -4,6 +4,7 @@
 #include "FileCommands.hxx"
 #include "Request.hxx"
 #include "protocol/Ack.hxx"
+#include "protocol/Verify.hxx"
 #include "client/Client.hxx"
 #include "client/Response.hxx"
 #include "util/CharUtil.hxx"
@@ -34,18 +35,13 @@
 #include <cassert>
 #include <array>
 
+using std::string_view_literals::operator""sv;
+
 [[gnu::pure]]
 static bool
 SkipNameFS(PathTraitsFS::const_pointer name_fs) noexcept
 {
 	return PathTraitsFS::IsSpecialFilename(name_fs);
-}
-
-[[gnu::pure]]
-static bool
-skip_path(Path name_fs) noexcept
-{
-	return name_fs.HasNewline();
 }
 
 CommandResult
@@ -55,7 +51,7 @@ handle_listfiles_local(Response &r, Path path_fs)
 
 	while (reader.ReadEntry()) {
 		const Path name_fs = reader.GetEntry();
-		if (SkipNameFS(name_fs.c_str()) || skip_path(name_fs))
+		if (SkipNameFS(name_fs.c_str()) || !VerifySeenFilename(name_fs))
 			continue;
 
 		std::string name_utf8 = name_fs.ToUTF8();
@@ -139,6 +135,7 @@ find_stream_art(std::string_view directory, Mutex &mutex)
 	static constexpr auto art_names = std::array {
 		"cover.png",
 		"cover.jpg",
+		"cover.jxl",
 		"cover.webp",
 	};
 
@@ -228,7 +225,7 @@ read_stream_art(Response &r, const std::string_view art_directory,
  */
 [[gnu::pure]]
 static std::string_view
-RealDirectoryOfSong(Client &client, const char *song_uri,
+RealDirectoryOfSong(Client &client, const std::string_view song_uri,
 		    std::string_view directory_uri) noexcept
 try {
 	const auto *db = client.GetDatabase();
@@ -259,7 +256,7 @@ try {
 }
 
 static CommandResult
-read_db_art(Client &client, Response &r, const char *uri, const uint64_t offset)
+read_db_art(Client &client, Response &r, std::string_view uri, const uint64_t offset)
 {
 	const Storage *storage = client.GetStorage();
 	if (storage == nullptr) {
@@ -329,7 +326,7 @@ public:
 			throw ProtocolError(ACK_ERROR_ARG, "Bad file offset");
 	}
 
-	void OnPicture(const char *mime_type,
+	void OnPicture(std::string_view mime_type,
 		       std::span<const std::byte> buffer) noexcept override {
 		if (found)
 			/* only use the first picture */
@@ -342,9 +339,9 @@ public:
 			return;
 		}
 
-		    response.Fmt("size: {}\n", buffer.size());
+		response.Fmt("size: {}\n"sv, buffer.size());
 
-		if (mime_type != nullptr)
+		if (mime_type.data() != nullptr)
 			response.Fmt("type: {}\n", mime_type);
 
 		buffer = buffer.subspan(offset);

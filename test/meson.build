@@ -3,6 +3,7 @@ gtest_dep = dependency('gtest', main: true,
                        fallback: ['gtest', 'gtest_main_dep'])
 
 subdir('util')
+subdir('co')
 subdir('net')
 subdir('time')
 subdir('tag')
@@ -441,6 +442,7 @@ executable(
     decoder_glue_dep,
     input_glue_dep,
     archive_glue_dep,
+    cmdline_dep,
   ],
 )
 
@@ -489,6 +491,7 @@ if ogg_dep.found()
     'DumpOgg.cxx',
     include_directories: inc,
     dependencies: [
+      fmt_dep,
       ogg_dep,
       input_glue_dep,
       archive_glue_dep,

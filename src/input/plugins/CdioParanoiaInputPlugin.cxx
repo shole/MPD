@@ -10,6 +10,7 @@
 #include "lib/fmt/RuntimeError.hxx"
 #include "../InputStream.hxx"
 #include "../InputPlugin.hxx"
+#include "thread/ScopeUnlock.hxx"
 #include "util/StringCompare.hxx"
 #include "util/Domain.hxx"
 #include "util/ByteOrder.hxx"
@@ -124,34 +125,32 @@ input_cdio_init(EventLoop &, const ConfigBlock &block)
 }
 
 struct CdioUri {
-	char device[64];
+	std::string_view device;
 	int track;
 };
 
 static CdioUri
 parse_cdio_uri(std::string_view src)
 {
-	CdioUri dest;
-
 	src = StringAfterPrefixIgnoreCase(src, "cdda://"sv);
 
-	const auto [device, track] = Split(src, '/');
-	if (device.size() >= sizeof(dest.device))
-		throw std::invalid_argument{"Device name is too long"};
+	const auto [device, track] = SplitLast(src, '/');
 
-	*std::copy(device.begin(), device.end(), dest.device) = '\0';
+	/* play the whole CD by default */
+	int track_number = -1;
 
 	if (!track.empty()) {
 		auto value = ParseInteger<uint_least16_t>(track);
 		if (!value)
 			throw std::invalid_argument{"Bad track number"};
 
-		dest.track = *value;
-	} else
-		/* play the whole CD */
-		dest.track = -1;
+		track_number = *value;
+	}
 
-	return dest;
+	return {
+		.device = device,
+		.track = track_number,
+	};
 }
 
 static AllocatedPath
@@ -177,7 +176,7 @@ input_cdio_open(std::string_view uri,
 	const auto parsed_uri = parse_cdio_uri(uri);
 
 	/* get list of CD's supporting CD-DA */
-	const AllocatedPath device = parsed_uri.device[0] != 0
+	const AllocatedPath device = !parsed_uri.device.empty()
 		? AllocatedPath::FromFS(parsed_uri.device)
 		: cdio_detect_device();
 	if (device.IsNull())
@@ -262,9 +261,11 @@ input_cdio_open(std::string_view uri,
 }
 
 void
-CdioParanoiaInputStream::Seek(std::unique_lock<Mutex> &,
+CdioParanoiaInputStream::Seek(std::unique_lock<Mutex> &lock,
 			      offset_type new_offset)
 {
+	assert(lock.mutex() == &mutex);
+
 	if (new_offset > size)
 		throw FmtRuntimeError("Invalid offset to seek {} ({})",
 				      new_offset, size);
@@ -277,7 +278,7 @@ CdioParanoiaInputStream::Seek(std::unique_lock<Mutex> &,
 	const lsn_t lsn_relofs = new_offset / CDIO_CD_FRAMESIZE_RAW;
 
 	if (lsn_relofs != buffer_lsn) {
-		const ScopeUnlock unlock(mutex);
+		const ScopeUnlock unlock{lock};
 		para.Seek(lsn_from + lsn_relofs);
 	}
 
@@ -285,9 +286,11 @@ CdioParanoiaInputStream::Seek(std::unique_lock<Mutex> &,
 }
 
 size_t
-CdioParanoiaInputStream::Read(std::unique_lock<Mutex> &,
+CdioParanoiaInputStream::Read(std::unique_lock<Mutex> &lock,
 			      std::span<std::byte> dest)
 {
+	assert(lock.mutex() == &mutex);
+
 	/* end of track ? */
 	if (IsEOF())
 		return 0;
@@ -299,7 +302,7 @@ CdioParanoiaInputStream::Read(std::unique_lock<Mutex> &,
 	const std::size_t diff = offset % CDIO_CD_FRAMESIZE_RAW;
 
 	if (lsn_relofs != buffer_lsn) {
-		const ScopeUnlock unlock(mutex);
+		const ScopeUnlock unlock{lock};
 
 		try {
 			rbuf = para.Read().data();

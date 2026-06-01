@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-2-Clause
 // Copyright CM4all GmbH
-// author: Max Kellermann <mk@cm4all.com>
+// author: Max Kellermann <max.kellermann@ionos.com>
 
 #pragma once
 
@@ -52,11 +52,36 @@ public:
 	}
 
 	/**
+	 * Set the due time as an absolute time point.  This can be
+	 * done to prepare an eventual ScheduleCurrent() call.  Must
+	 * not be called while the timer is already scheduled.
+	 */
+	void SetDue(Event::TimePoint _due) noexcept {
+		assert(!IsPending());
+
+		due = _due;
+	}
+
+	/**
+	 * Set the due time as a duration relative to now.  This can
+	 * done to prepare an eventual ScheduleCurrent() call.  Must
+	 * not be called while the timer is already scheduled.
+	 */
+	void SetDue(Event::Duration d) noexcept;
+
+	/**
 	 * Was this timer scheduled?
 	 */
 	bool IsPending() const noexcept {
 		return is_linked();
 	}
+
+	/**
+	 * Schedule the timer at the due time that was already set;
+	 * either by SetDue() or by a Schedule() call that was already
+	 * canceled.
+	 */
+	void ScheduleCurrent() noexcept;
 
 	void Schedule(Event::Duration d) noexcept;
 
@@ -64,6 +89,7 @@ public:
 	 * Like Schedule(), but is a no-op if there is a due time
 	 * earlier than the given one.
 	 */
+	void ScheduleEarlier(Event::TimePoint t) noexcept;
 	void ScheduleEarlier(Event::Duration d) noexcept;
 
 	void Cancel() noexcept {

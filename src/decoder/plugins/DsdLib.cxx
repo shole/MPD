@@ -29,19 +29,13 @@ DsdId::Equals(const char *s) const noexcept
 	return memcmp(value, s, sizeof(value)) == 0;
 }
 
-/**
- * Skip the #InputStream to the specified offset.
- */
 bool
 dsdlib_skip_to(DecoderClient *client, InputStream &is,
 	       offset_type offset)
 {
 	if (is.IsSeekable()) {
-		try {
-			is.LockSeek(offset);
-		} catch (...) {
-			return false;
-		}
+		is.LockSeek(offset);
+		return true;
 	}
 
 	if (is.GetOffset() > offset)
@@ -50,9 +44,6 @@ dsdlib_skip_to(DecoderClient *client, InputStream &is,
 	return dsdlib_skip(client, is, offset - is.GetOffset());
 }
 
-/**
- * Skip some bytes from the #InputStream.
- */
 bool
 dsdlib_skip(DecoderClient *client, InputStream &is,
 	    offset_type delta)
@@ -61,11 +52,8 @@ dsdlib_skip(DecoderClient *client, InputStream &is,
 		return true;
 
 	if (is.IsSeekable()) {
-		try {
-			is.LockSeek(is.GetOffset() + delta);
-		} catch (...) {
-			return false;
-		}
+		is.LockSeek(is.GetOffset() + delta);
+		return true;
 	}
 
 	if (delta > 1024 * 1024)

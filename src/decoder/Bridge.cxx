@@ -135,7 +135,7 @@ DecoderBridge::FlushChunk() noexcept
 	if (!chunk->IsEmpty())
 		dc.pipe->Push(std::move(chunk));
 
-	const std::scoped_lock protect{dc.mutex};
+	const std::lock_guard protect{dc.mutex};
 	dc.client_cond.notify_one();
 }
 
@@ -197,7 +197,7 @@ DecoderBridge::GetVirtualCommand() noexcept
 DecoderCommand
 DecoderBridge::LockGetVirtualCommand() noexcept
 {
-	const std::scoped_lock protect{dc.mutex};
+	const std::lock_guard protect{dc.mutex};
 	return GetVirtualCommand();
 }
 
@@ -261,7 +261,7 @@ DecoderBridge::Ready(const AudioFormat audio_format,
 		 seekable);
 
 	{
-		const std::scoped_lock protect{dc.mutex};
+		const std::lock_guard protect{dc.mutex};
 		dc.SetReady(audio_format, seekable, duration);
 	}
 
@@ -287,7 +287,7 @@ DecoderBridge::GetCommand() noexcept
 void
 DecoderBridge::CommandFinished() noexcept
 {
-	const std::scoped_lock protect{dc.mutex};
+	const std::lock_guard protect{dc.mutex};
 
 	assert(dc.command != DecoderCommand::NONE || initial_seek_running);
 	assert(dc.command != DecoderCommand::SEEK ||
@@ -348,9 +348,12 @@ DecoderBridge::GetSeekFrame() noexcept
 }
 
 void
-DecoderBridge::SeekError() noexcept
+DecoderBridge::SeekError(std::exception_ptr &&_error) noexcept
 {
 	assert(dc.pipe != nullptr);
+
+	if (!_error)
+		_error = std::make_exception_ptr(std::runtime_error{"Decoder failed to seek"});
 
 	if (initial_seek_running) {
 		/* d'oh, we can't seek to the sub-song start position,
@@ -358,14 +361,14 @@ DecoderBridge::SeekError() noexcept
 		initial_seek_running = false;
 
 		if (initial_seek_essential)
-			error = std::make_exception_ptr(std::runtime_error("Decoder failed to seek"));
+			error = std::move(_error);
 
 		return;
 	}
 
 	assert(dc.command == DecoderCommand::SEEK);
 
-	dc.seek_error = true;
+	dc.seek_error = std::move(_error);
 	seeking = false;
 
 	CommandFinished();

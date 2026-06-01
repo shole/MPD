@@ -7,8 +7,9 @@
 #include "fs/AllocatedPath.hxx"
 #include "ls.hxx"
 #include "storage/Registry.hxx"
-#include "util/ASCII.hxx"
+#include "util/StringCompare.hxx"
 #include "util/UriExtract.hxx"
+#include "util/UriUtil.hxx"
 
 #ifdef ENABLE_DATABASE
 #include "storage/StorageInterface.hxx"
@@ -16,8 +17,10 @@
 
 #include <stdexcept>
 
+using std::string_view_literals::operator""sv;
+
 static LocatedUri
-LocateFileUri(const char *uri, const IClient *client
+LocateFileUri(const std::string_view uri, const IClient *client
 #ifdef ENABLE_DATABASE
 	      , const Storage *storage
 #endif
@@ -31,8 +34,7 @@ LocateFileUri(const char *uri, const IClient *client
 		if (suffix.data() != nullptr)
 			/* this path was relative to the music
 			   directory */
-			// TODO: don't use suffix.data() (ok for now because we know it's null-terminated)
-			return {LocatedUri::Type::RELATIVE, suffix.data()};
+			return {LocatedUri::Type::RELATIVE, suffix};
 	}
 #endif
 
@@ -43,7 +45,7 @@ LocateFileUri(const char *uri, const IClient *client
 }
 
 static LocatedUri
-LocateAbsoluteUri(UriPluginKind kind, const char *uri
+LocateAbsoluteUri(UriPluginKind kind, const std::string_view uri
 #ifdef ENABLE_DATABASE
 		  , const Storage *storage
 #endif
@@ -72,8 +74,7 @@ LocateAbsoluteUri(UriPluginKind kind, const char *uri
 	if (storage != nullptr) {
 		const auto suffix = storage->MapToRelativeUTF8(uri);
 		if (suffix.data() != nullptr)
-			// TODO: don't use suffix.data() (ok for now because we know it's null-terminated)
-			return {LocatedUri::Type::RELATIVE, suffix.data()};
+			return {LocatedUri::Type::RELATIVE, suffix};
 	}
 
 	if (kind == UriPluginKind::STORAGE &&
@@ -86,15 +87,15 @@ LocateAbsoluteUri(UriPluginKind kind, const char *uri
 
 LocatedUri
 LocateUri(UriPluginKind kind,
-	  const char *uri, const IClient *client
+	  const std::string_view uri, const IClient *client,
 #ifdef ENABLE_DATABASE
-	  , const Storage *storage
+	  const Storage *storage,
 #endif
-	  )
+	  bool allow_empty)
 {
 	/* skip the obsolete "file://" prefix */
-	const char *path_utf8 = StringAfterPrefixCaseASCII(uri, "file://");
-	if (path_utf8 != nullptr) {
+	if (const auto path_utf8 = StringAfterPrefixIgnoreCase(uri, "file://"sv);
+	    path_utf8.data() != nullptr) {
 		if (!PathTraitsUTF8::IsAbsolute(path_utf8))
 			throw std::invalid_argument("Malformed file:// URI");
 
@@ -115,6 +116,12 @@ LocateUri(UriPluginKind kind,
 					 , storage
 #endif
 					 );
-	else
+	else if (allow_empty && uri.empty())
 		return LocatedUri(LocatedUri::Type::RELATIVE, uri);
+	else {
+		if (!uri_safe_local(uri))
+			throw std::invalid_argument{"Bad relative path"};
+
+		return LocatedUri(LocatedUri::Type::RELATIVE, uri);
+	}
 }
